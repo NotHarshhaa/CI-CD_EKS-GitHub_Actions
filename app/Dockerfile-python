@@ -1,6 +1,27 @@
-FROM python:3.11-slim
+# Use a smaller base image for reduced size
+FROM python:3.11-alpine
+
+# Set a working directory
 WORKDIR /app
-RUN pip install flask==2.3
-COPY . /app/
-ENV FLASK_APP=app.py
+
+# Set environment variables for performance and security
+ENV FLASK_APP=app.py \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1
+
+# Install dependencies
+COPY requirements.txt .  
+RUN pip install --no-cache-dir -r requirements.txt
+
+# Copy application files
+COPY . .
+
+# Use a non-root user for security
+RUN addgroup -S appgroup && adduser -S appuser -G appgroup
+USER appuser
+
+# Expose the Flask port
+EXPOSE 5000
+
+# Run the application
 CMD ["flask", "run", "--host=0.0.0.0", "--port=5000"]

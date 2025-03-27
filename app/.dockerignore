@@ -1,7 +1,29 @@
+# Ignore Docker-related files
 Dockerfile
-node_modules
-npm-debug.log
-app.py
 Dockerfile-python
-terraform
-kustomize
+
+# Ignore dependency folders
+node_modules
+__pycache__
+
+# Ignore log files and temp files
+npm-debug.log
+*.log
+
+# Ignore application-specific files
+app.py
+
+# Ignore Infrastructure as Code (IaC) directories
+terraform/
+kustomize/
+
+# Ignore Python virtual environments
+venv/
+.env
+
+# Ignore system and IDE-specific files
+*.swp
+*.swo
+.DS_Store
+.idea/
+.vscode/

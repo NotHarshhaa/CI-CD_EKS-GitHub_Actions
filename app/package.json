@@ -1,15 +1,25 @@
 {
-    "name": "addition-app",
-    "version": "1.0.0",
-    "description": "",
-    "main": "index.js",
-    "scripts": {
-    "test": "jest"
-    },
-    "dependencies": {
-        "jest": "^29.6.1"
-      },
-    "keywords": [],
-    "author": "Afraz",
-    "license": "MIT"
-    }
+  "name": "addition-app",
+  "version": "1.0.0",
+  "description": "A simple addition application built with Node.js",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js",
+    "dev": "nodemon index.js",
+    "test": "jest --coverage",
+    "lint": "eslint ."
+  },
+  "dependencies": {
+    "jest": "^29.6.1"
+  },
+  "devDependencies": {
+    "nodemon": "^3.0.0",
+    "eslint": "^8.55.0"
+  },
+  "keywords": ["nodejs", "addition", "jest", "testing"],
+  "author": "Afraz",
+  "license": "MIT",
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
