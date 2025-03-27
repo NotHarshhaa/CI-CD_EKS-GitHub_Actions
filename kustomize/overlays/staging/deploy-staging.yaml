@@ -2,13 +2,22 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: web-deployment
+  labels:
+    app: web
+    env: staging
 spec:
   replicas: 3
+  selector:
+    matchLabels:
+      app: web
   template:
+    metadata:
+      labels:
+        app: web
     spec:
       containers:
       - name: nginx
-        image: aphraz/node-app:1.1.1-dev
+        image: aphraz/node-app:1.1.1-staging
         imagePullPolicy: Always
         resources:
           limits:
@@ -17,6 +26,7 @@ spec:
           requests:
             cpu: "500m"
             memory: "512Mi"
+      restartPolicy: Always
   strategy:
     type: RollingUpdate
     rollingUpdate:

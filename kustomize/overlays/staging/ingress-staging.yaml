@@ -4,8 +4,14 @@ metadata:
   name: e2ecicd-ingress
   annotations:
     nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"  # Redirects HTTP to HTTPS
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"  # Increases request body size limit
 spec:
   ingressClassName: nginx
+  tls:
+  - hosts:
+      - staging.afraz.dev
+    secretName: staging-tls-secret  # TLS secret for HTTPS
   rules:
   - host: staging.afraz.dev
     http:
