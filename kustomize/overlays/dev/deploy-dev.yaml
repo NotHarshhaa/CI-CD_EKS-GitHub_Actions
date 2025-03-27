@@ -2,18 +2,27 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: web-deployment
+  labels:
+    app: my-node-app
+    environment: dev
 spec:
   replicas: 1
+  selector:
+    matchLabels:
+      app: my-node-app
   template:
+    metadata:
+      labels:
+        app: my-node-app
     spec:
       containers:
-      - name: my-node-app
-        image: aphraz/node-app:1.1.1-dev
-        imagePullPolicy: Always
-        resources:
-          limits:
-            cpu: "200m"
-            memory: "256Mi"
-          requests:
-            cpu: "100m"
-            memory: "128Mi"
+        - name: my-node-app
+          image: aphraz/node-app:1.1.1-dev
+          imagePullPolicy: Always
+          resources:
+            limits:
+              cpu: "200m"
+              memory: "256Mi"
+            requests:
+              cpu: "100m"
+              memory: "128Mi"

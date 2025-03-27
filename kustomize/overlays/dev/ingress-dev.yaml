@@ -4,8 +4,15 @@ metadata:
   name: e2ecicd-ingress
   annotations:
     nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "60"
 spec:
   ingressClassName: nginx
+  tls:
+  - hosts:
+      - dev.afraz.dev
+    secretName: dev-afraz-tls  # Ensure you create a TLS secret for HTTPS
   rules:
   - host: dev.afraz.dev
     http:
