@@ -12,3 +12,17 @@ spec:
     metadata:
       labels:
         app: web
+    spec:
+      containers:
+      - name: web-container
+        image: aphraz/node-app:latest
+        imagePullPolicy: Always
+        ports:
+        - containerPort: 3000
+        resources:
+          limits:
+            cpu: "500m"
+            memory: "256Mi"
+          requests:
+            cpu: "250m"
+            memory: "128Mi"

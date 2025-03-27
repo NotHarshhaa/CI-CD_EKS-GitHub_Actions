@@ -4,10 +4,16 @@ metadata:
   name: e2ecicd-ingress
   annotations:
     nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
 spec:
-  ingressClassName: nginx-example
+  ingressClassName: nginx
+  tls:
+  - hosts:
+    - site.afraz.com
+    secretName: site-tls-secret  # TLS certificate for HTTPS
   rules:
-  - host: "site.afraz.com"
+  - host: site.afraz.com
     http:
       paths:
       - path: /

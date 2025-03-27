@@ -2,10 +2,15 @@ apiVersion: v1
 kind: Service
 metadata:
   name: web-service
+  labels:
+    app: web
+    environment: production
 spec:
-  ports:
-  - port: 80
-    targetPort: 3000
   selector:
     app: web
-
+  ports:
+    - name: http
+      protocol: TCP
+      port: 80
+      targetPort: 3000
+  type: ClusterIP  # Change to LoadBalancer or NodePort if needed
