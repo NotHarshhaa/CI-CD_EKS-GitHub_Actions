@@ -1,13 +1,39 @@
+# Terraform state and cache files
 **/.terraform/*
 *.tfstate
 *.tfstate.*
 *.tfplan
-*.log
+.terraform.lock.hcl
+
+# Terraform variable files (sensitive data)
 *.tfvars
+*.tfvars.json
 override.tf
 override.tf.json
 *_override.tf
 *_override.tf.json
+
+# Terraform CLI configuration
 .terraformrc
 terraform.rc
-.terraform.lock.hcl
+
+# Logs and debug files
+*.log
+crash.log
+
+# Kubernetes-specific files
+.kube/
+kubeconfig
+kubectl.log
+
+# Ignore editor-specific files
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+
+# Ignore temporary and backup files
+*.bak
+*.tmp
+*.backup
