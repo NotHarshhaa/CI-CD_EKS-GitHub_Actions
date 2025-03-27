@@ -2,13 +2,22 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: web-deployment
+  labels:
+    app: web
+    env: production
 spec:
   replicas: 3
+  selector:
+    matchLabels:
+      app: web
   template:
+    metadata:
+      labels:
+        app: web
     spec:
       containers:
-      - name: nginx
-        image: aphraz/node-app:1.1.1-dev
+      - name: web-app
+        image: aphraz/node-app:1.1.1-prod  # Production-specific image
         imagePullPolicy: Always
         resources:
           limits:
@@ -17,6 +26,25 @@ spec:
           requests:
             cpu: "500m"
             memory: "512Mi"
+        ports:
+          - containerPort: 3000
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 3000
+          initialDelaySeconds: 5
+          periodSeconds: 10
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 3000
+          initialDelaySeconds: 10
+          periodSeconds: 20
+        securityContext:
+          runAsUser: 1000
+          runAsGroup: 1000
+          allowPrivilegeEscalation: false
+      terminationGracePeriodSeconds: 30
   strategy:
     type: RollingUpdate
     rollingUpdate:

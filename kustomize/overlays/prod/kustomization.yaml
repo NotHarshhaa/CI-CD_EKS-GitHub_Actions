@@ -1,12 +1,26 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
+namespace: app-prod
+
 resources:
 - ../../base
 
-patches:
-- path: deploy-prod.yaml
-- path: svc-prod.yaml
-- path: ingress-prod.yaml
+patchesStrategicMerge:
+- deploy-prod.yaml
+- svc-prod.yaml
+- ingress-prod.yaml
 
-namespace: app-prod
+configMapGenerator:
+- name: app-prod-config
+  files:
+  - config/app-config.yaml  # Ensure this file exists in your repo
+  options:
+    disableNameSuffixHash: true
+
+secretGenerator:
+- name: app-prod-secrets
+  files:
+  - secrets/db-password.txt  # Ensure this file exists and is encrypted properly
+  options:
+    disableNameSuffixHash: true
