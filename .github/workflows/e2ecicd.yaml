@@ -22,7 +22,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     outputs:
-      releaseTrue: ${{steps.release-status.outptus.rel-status}}
+      releaseTrue: ${{steps.release-status.outputs.rel-status}}
       currentVersion: ${{ steps.updated-version.outputs.version }}
       currentENV: ${{ steps.current-env.outputs.ENV }}
     steps:
@@ -50,20 +50,22 @@ jobs:
         commit_message=$(git log -1 --pretty=%B)
         if [[ "$commit_message" == *"major:"* ]]; then
           echo "increment=major" >> "$GITHUB_OUTPUT"
-          echo "release=true" >> "$GITHUB_ENV"
+          echo "release=true" >> "$GITHUB_OUTPUT"
         elif [[ "$commit_message" == "minor:"* ]]; then
           echo "increment=minor" >> "$GITHUB_OUTPUT"
-          echo "release=true" >> "$GITHUB_ENV"
+          echo "release=true" >> "$GITHUB_OUTPUT"
         elif [[ "$commit_message" == "patch:"* ]]; then
           echo "increment=patch" >> "$GITHUB_OUTPUT"
-          echo "release=true" >> "$GITHUB_ENV"
+          echo "release=true" >> "$GITHUB_OUTPUT"
         else
-          echo "release=false" >> "$GITHUB_ENV"
+          echo "release=false" >> "$GITHUB_OUTPUT"
         fi
     - name: Publish Release Status
       id: release-status
-      run: echo "rel-status=${{ env.release }}" >> "$GITHUB_OUTPUT"
-
+      run: |
+        echo "rel-status=${{ env.release }}" >> "$GITHUB_OUTPUT"
+      env:
+        release: ${{ steps.version-increment.outputs.release }}
 
     - name: Publish Current Environment
       id: current-env
@@ -80,14 +82,14 @@ jobs:
       id: increment-version
       run: echo "new_version=$(docker run --rm -v ${PWD}:/app treeder/bump ${{ steps.version-increment.outputs.increment }})" >> "$GITHUB_OUTPUT"
       if: |
-        github.ref == 'refs/heads/dev' &&
-        env.release == 'true'
+        github.ref == 'refs/heads/dev' && 
+        ${{ steps.version-increment.outputs.release }} == 'true'
 
     - name: Update VERSION file
       run: echo "${{ steps.increment-version.outputs.new_version }}" > VERSION
       if: |
         github.ref == 'refs/heads/dev' &&
-        env.release == 'true'
+        ${{ steps.version-increment.outputs.release }} == 'true'
 
     - name: Get updated version
       id: updated-version
@@ -107,9 +109,7 @@ jobs:
         tag_push: '--force'
       if: |
         github.ref == 'refs/heads/dev' &&
-        env.release == 'true'
-
-
+        ${{ steps.version-increment.outputs.release }} == 'true'
 
     - name: Login to DockerHub
       uses: docker/login-action@v2
@@ -156,7 +156,7 @@ jobs:
         AS_VERSION: ${{ steps.updated-version.outputs.version }}
       if: |
         github.ref == 'refs/heads/dev' &&
-        env.release == 'true'
+        ${{ steps.version-increment.outputs.release }} == 'true'
 
     - name: Notify Slack
       uses: 8398a7/action-slack@v3
@@ -173,7 +173,7 @@ jobs:
       env:
         SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK }}
         AS_VERSION: ${{ steps.updated-version.outputs.version }}
-      if: env.release == 'false'
+      if: ${{ steps.version-increment.outputs.release }} == 'false'
 
   deployment:
     needs: build
