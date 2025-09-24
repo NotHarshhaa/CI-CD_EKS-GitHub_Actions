@@ -32,22 +32,27 @@
 
 ## **📂 Repository Structure**  
 
-The repository is structured for **modularity and maintainability**.:
+The repository is structured for **modularity and maintainability**:
 
 ```tree
 📂 root  
-├── 📂 app                      # Application source code  
-│   ├── app.py                 # Python application logic (if applicable)  
+├── 📂 .github/workflows/      # GitHub Actions CI/CD workflows
+│   ├── ci.yml                 # Continuous Integration pipeline
+│   └── cd.yml                 # Continuous Deployment pipeline
+│
+├── 📂 app                     # Application source code  
+│   ├── app.py                 # Python application logic (Flask)  
 │   ├── calculator.js          # Business logic for calculations  
 │   ├── calculator.test.js     # Unit tests for calculator functions  
-│   ├── Dockerfile             # Dockerfile for building the Node.js app  
-│   ├── Dockerfile-python      # Dockerfile for a Python-based version (if needed)  
+│   ├── Dockerfile             # Optimized Dockerfile for Node.js app  
+│   ├── Dockerfile-python      # Dockerfile for Python Flask version  
 │   ├── index.js               # Main entry point of the Node.js application  
-│   └── package.json           # Project dependencies and scripts  
+│   ├── package.json           # Project dependencies and scripts  
+│   └── requirements.txt       # Python dependencies  
 │  
 ├── 📂 kustomize               # Kubernetes manifests managed with Kustomize  
 │   ├── 📂 base                # Base configurations common for all environments  
-│   │   ├── deploy.yaml        # Deployment definition for the application  
+│   │   ├── deploy.yaml        # Enhanced deployment with health checks & security  
 │   │   ├── ingress.yaml       # Ingress configuration for routing traffic  
 │   │   ├── kustomization.yaml # Kustomize configuration file  
 │   │   └── svc.yaml           # Kubernetes Service definition  
@@ -71,8 +76,6 @@ The repository is structured for **modularity and maintainability**.:
 │   │   │   ├── kustomization.yaml     # Kustomize configuration for Staging  
 │   │   │   └── svc-staging.yaml       # Staging-specific service settings  
 │  
-├── README.md                  # Project documentation and setup guide  
-│  
 ├── 📂 terraform               # Terraform configuration for infrastructure provisioning  
 │   ├── ingress-nginx.tf       # Terraform script for setting up NGINX Ingress  
 │   ├── main.tf                # Main Terraform file defining AWS infrastructure  
@@ -80,8 +83,51 @@ The repository is structured for **modularity and maintainability**.:
 │   ├── terraform.tf           # Backend configuration for Terraform state management  
 │   └── variables.tf           # Input variables for Terraform modules  
 │  
+├── .eslintrc.js               # ESLint configuration for code quality  
+├── .gitignore                 # Comprehensive gitignore file  
+├── docker-compose.yml         # Local development environment  
+├── nginx.conf                 # Nginx configuration for local development  
+├── README.md                  # Project documentation and setup guide  
 └── VERSION                    # Tracks application versioning (Semantic Versioning)  
 ```
+
+---
+
+## **🚀 Recent Improvements**  
+
+This project has been enhanced with the following improvements:
+
+### **🔧 Application Enhancements**
+- ✅ **Enhanced Error Handling** - Better error responses and graceful shutdown
+- ✅ **Health Check Endpoints** - `/health` endpoint for monitoring
+- ✅ **API Endpoints** - RESTful API at `/api/calculate` for programmatic access
+- ✅ **CORS Support** - Cross-origin resource sharing enabled
+- ✅ **Improved UI** - Better styling and user experience
+- ✅ **Graceful Shutdown** - Proper signal handling for container orchestration
+
+### **🐳 Docker & Security Improvements**
+- ✅ **Multi-stage Docker Build** - Optimized image size and security
+- ✅ **Non-root User** - Enhanced security with proper user permissions
+- ✅ **Health Checks** - Built-in container health monitoring
+- ✅ **Signal Handling** - Proper process management with dumb-init
+
+### **☸️ Kubernetes Enhancements**
+- ✅ **Liveness & Readiness Probes** - Better container health monitoring
+- ✅ **Security Context** - Enhanced security with non-root execution
+- ✅ **Resource Management** - Proper CPU and memory limits
+- ✅ **Rolling Updates** - Zero-downtime deployments
+
+### **🔄 CI/CD Pipeline**
+- ✅ **GitHub Actions Workflows** - Automated CI/CD with security scanning
+- ✅ **Multi-Node Testing** - Testing across Node.js 18.x and 20.x
+- ✅ **Security Scanning** - Trivy vulnerability scanning
+- ✅ **Code Quality** - ESLint integration and coverage reporting
+
+### **🛠️ Development Tools**
+- ✅ **Docker Compose** - Local development environment
+- ✅ **ESLint Configuration** - Code quality and consistency
+- ✅ **Comprehensive .gitignore** - Proper version control
+- ✅ **Nginx Configuration** - Local reverse proxy setup
 
 ---
 
@@ -89,14 +135,51 @@ The repository is structured for **modularity and maintainability**.:
 
 Before you proceed, ensure you have the following installed:  
 
-- 🛠 **Node.js (>=14.x)**  
-- 🐳 **Docker (latest version)**  
+- 🛠 **Node.js (>=18.x)**  
+- 🐳 **Docker & Docker Compose**  
 - 🏗️ **Terraform (>=1.0)**  
 - ☸ **kubectl (latest version)**  
 - 🎭 **Kustomize**  
 - ☁ **AWS CLI & eksctl**  
 - ⚙️ **GitHub Actions configured**  
 - 🔑 **AWS IAM permissions to manage EKS**  
+
+---
+
+## **🏃‍♂️ Quick Start (Local Development)**  
+
+### **Option 1: Docker Compose (Recommended)**
+```bash
+# Clone the repository
+git clone https://github.com/NotHarshhaa/CI-CD_EKS-GitHub_Actions.git
+cd CI-CD_EKS-GitHub_Actions
+
+# Start the application with Docker Compose
+docker-compose up --build
+
+# Access the application
+# Web UI: http://localhost:80
+# Health Check: http://localhost:80/health
+# API: POST http://localhost:80/api/calculate
+```
+
+### **Option 2: Local Node.js Development**
+```bash
+# Navigate to app directory
+cd app
+
+# Install dependencies
+npm install
+
+# Run in development mode
+npm run dev
+
+# Run tests
+npm test
+
+# Run linting
+npm run lint
+```
 
 ---
 

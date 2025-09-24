@@ -3,8 +3,16 @@ kind: Deployment
 metadata:
   name: web-deployment
   namespace: default
+  labels:
+    app: web
+    version: v1
 spec:
   replicas: 1
+  strategy:
+    type: RollingUpdate
+    rollingUpdate:
+      maxUnavailable: 1
+      maxSurge: 1
   selector:
     matchLabels:
       app: web
@@ -12,6 +20,7 @@ spec:
     metadata:
       labels:
         app: web
+        version: v1
     spec:
       containers:
       - name: web-container
@@ -19,6 +28,13 @@ spec:
         imagePullPolicy: Always
         ports:
         - containerPort: 3000
+          name: http
+          protocol: TCP
+        env:
+        - name: NODE_ENV
+          value: "production"
+        - name: PORT
+          value: "3000"
         resources:
           limits:
             cpu: "500m"
@@ -26,3 +42,31 @@ spec:
           requests:
             cpu: "250m"
             memory: "128Mi"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 3000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 3000
+          initialDelaySeconds: 5
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+        securityContext:
+          allowPrivilegeEscalation: false
+          runAsNonRoot: true
+          runAsUser: 1001
+          readOnlyRootFilesystem: true
+          capabilities:
+            drop:
+            - ALL
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+        fsGroup: 1001

@@ -1,25 +1,47 @@
 {
-  "name": "addition-app",
-  "version": "1.0.0",
-  "description": "A simple addition application built with Node.js",
+  "name": "calculator-app",
+  "version": "1.2.0",
+  "description": "A simple calculator application built with Node.js for CI/CD EKS deployment",
   "main": "index.js",
   "scripts": {
     "start": "node index.js",
     "dev": "nodemon index.js",
-    "test": "jest --coverage",
-    "lint": "eslint ."
+    "test": "jest --coverage --watchAll=false",
+    "test:watch": "jest --watch",
+    "lint": "eslint .",
+    "lint:fix": "eslint . --fix",
+    "health": "curl -f http://localhost:3000/health || exit 1"
   },
-  "dependencies": {
-    "jest": "^29.6.1"
-  },
+  "dependencies": {},
   "devDependencies": {
+    "jest": "^29.6.1",
     "nodemon": "^3.0.0",
     "eslint": "^8.55.0"
   },
-  "keywords": ["nodejs", "addition", "jest", "testing"],
-  "author": "Afraz",
+  "keywords": ["nodejs", "calculator", "jest", "testing", "kubernetes", "docker", "ci-cd"],
+  "author": "Harshhaa",
   "license": "MIT",
   "engines": {
     "node": ">=18.0.0"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/NotHarshhaa/CI-CD_EKS-GitHub_Actions.git"
+  },
+  "jest": {
+    "testEnvironment": "node",
+    "collectCoverageFrom": [
+      "*.js",
+      "!node_modules/**",
+      "!coverage/**"
+    ],
+    "coverageThreshold": {
+      "global": {
+        "branches": 80,
+        "functions": 80,
+        "lines": 80,
+        "statements": 80
+      }
+    }
   }
 }
