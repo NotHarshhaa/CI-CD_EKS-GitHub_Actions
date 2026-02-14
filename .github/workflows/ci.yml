@@ -2,9 +2,12 @@ name: CI Pipeline
 
 on:
   push:
-    branches: [ main, develop ]
+    branches: [ master, develop, staging ]
   pull_request:
-    branches: [ main, develop ]
+    branches: [ master, develop, staging ]
+
+env:
+  NODE_VERSION: 20
 
 jobs:
   test:
@@ -13,6 +16,7 @@ jobs:
     strategy:
       matrix:
         node-version: [18.x, 20.x]
+      fail-fast: false
     
     steps:
     - name: Checkout code
@@ -23,11 +27,12 @@ jobs:
       with:
         node-version: ${{ matrix.node-version }}
         cache: 'npm'
+        cache-dependency-path: app/package-lock.json
         
     - name: Install dependencies
       run: |
         cd app
-        npm ci
+        npm ci --production=false
         
     - name: Run linting
       run: |
@@ -37,18 +42,20 @@ jobs:
     - name: Run tests
       run: |
         cd app
-        npm test
+        npm test -- --coverage
         
     - name: Upload coverage reports
-      uses: codecov/codecov-action@v3
+      uses: codecov/codecov-action@v4
       with:
         file: ./app/coverage/lcov.info
         flags: unittests
         name: codecov-umbrella
         fail_ci_if_error: false
+        token: ${{ secrets.CODECOV_TOKEN }}
 
   security-scan:
     runs-on: ubuntu-latest
+    needs: test
     
     steps:
     - name: Checkout code
@@ -63,7 +70,7 @@ jobs:
         output: 'trivy-results.sarif'
         
     - name: Upload Trivy scan results to GitHub Security tab
-      uses: github/codeql-action/upload-sarif@v2
+      uses: github/codeql-action/upload-sarif@v3
       if: always()
       with:
         sarif_file: 'trivy-results.sarif'

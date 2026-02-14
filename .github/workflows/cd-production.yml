@@ -1,8 +1,8 @@
-name: CD Pipeline
+name: Production CD Pipeline
 
 on:
   push:
-    branches: [ main ]
+    branches: [ master ]
     tags: [ 'v*' ]
   workflow_dispatch:
 
@@ -10,6 +10,7 @@ env:
   AWS_REGION: us-west-2
   ECR_REPOSITORY: calculator-app
   EKS_CLUSTER_NAME: e2ecicd-cluster
+  NODE_VERSION: 20
 
 jobs:
   build-and-push:
@@ -19,6 +20,13 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
       
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+        cache-dependency-path: app/package-lock.json
+        
     - name: Configure AWS credentials
       uses: aws-actions/configure-aws-credentials@v4
       with:
@@ -30,6 +38,12 @@ jobs:
       id: login-ecr
       uses: aws-actions/amazon-ecr-login@v2
       
+    - name: Run tests
+      run: |
+        cd app
+        npm ci
+        npm test -- --coverage
+        
     - name: Build, tag, and push image to Amazon ECR
       id: build-image
       env:
@@ -43,16 +57,17 @@ jobs:
         docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
         echo "image=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_OUTPUT
         
-    - name: Update deployment image
+    - name: Update deployment image using Kustomize
       run: |
-        cd kustomize/base
-        sed -i "s|image: .*|image: ${{ steps.build-image.outputs.image }}|" deploy.yaml
+        cd kustomize/overlays/production
+        kustomize edit set image ${{ steps.build-image.outputs.image }}
+        kustomize build . > updated-deployment.yaml
         
     - name: Commit updated deployment
       run: |
         git config --local user.email "action@github.com"
         git config --local user.name "GitHub Action"
-        git add kustomize/base/deploy.yaml
+        git add kustomize/overlays/production/kustomization.yaml
         git commit -m "Update deployment image to ${{ github.sha }}" || exit 0
         git push
 
@@ -64,6 +79,13 @@ jobs:
     - name: Checkout code
       uses: actions/checkout@v4
       
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+        cache-dependency-path: app/package-lock.json
+        
     - name: Configure AWS credentials
       uses: aws-actions/configure-aws-credentials@v4
       with:
@@ -77,15 +99,38 @@ jobs:
         
     - name: Deploy to EKS
       run: |
-        kubectl apply -k kustomize/base/
+        kubectl apply -k kustomize/overlays/production/
         
     - name: Verify deployment
       run: |
-        kubectl rollout status deployment/web-deployment
-        kubectl get pods -l app=web
+        kubectl rollout status deployment/web-deployment -n app-prod --timeout=300s
+        kubectl get pods -l app=web -n app-prod
         
     - name: Run smoke tests
       run: |
         # Get the service endpoint
-        kubectl get service web-service
-        # Add your smoke tests here
+        SERVICE_URL=$(kubectl get service web-service -n app-prod -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+        echo "Service URL: http://$SERVICE_URL"
+        
+        # Wait for service to be ready
+        for i in {1..30}; do
+          if curl -f http://$SERVICE_URL/health; then
+            echo "Health check passed"
+            break
+          fi
+          echo "Waiting for service to be ready... ($i/30)"
+          sleep 10
+        done
+        
+    - name: Run security scan on deployed application
+      uses: aquasecurity/trivy-action@master
+      with:
+        image-ref: ${{ needs.build-and-push.outputs.image }}
+        format: 'sarif'
+        output: 'trivy-results.sarif'
+        
+    - name: Upload Trivy scan results
+      uses: github/codeql-action/upload-sarif@v3
+      if: always()
+      with:
+        sarif_file: 'trivy-results.sarif'

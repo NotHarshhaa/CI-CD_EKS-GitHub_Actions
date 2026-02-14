@@ -1,4 +1,4 @@
-name: CI/CD Pipeline
+name: Multi-Environment Deployment Pipeline
 
 on:
   pull_request:
@@ -16,8 +16,17 @@ on:
     paths-ignore:
     - 'VERSION'
     - 'README.md'
+  workflow_dispatch:
+
 permissions:
   contents: write
+  id-token: write
+  security-events: write
+
+env:
+  NODE_VERSION: 20
+  AWS_REGION: us-west-2
+
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -25,24 +34,41 @@ jobs:
       releaseTrue: ${{steps.release-status.outputs.rel-status}}
       currentVersion: ${{ steps.updated-version.outputs.version }}
       currentENV: ${{ steps.current-env.outputs.ENV }}
+      imageTag: ${{ steps.build-image.outputs.image-tag }}
     steps:
     - name: Checkout Code
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
 
-    - name: Setup Node
-      uses: actions/setup-node@v3
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
       with:
-        node-version: 18
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+        cache-dependency-path: app/package-lock.json
 
     - name: Install Dependencies
       run: |
         cd app
-        npm install
+        npm ci
+
+    - name: Run Linting
+      run: |
+        cd app
+        npm run lint
 
     - name: Run Tests
       run: |
         cd app
-        npm test
+        npm test -- --coverage
+
+    - name: Upload coverage reports
+      uses: codecov/codecov-action@v4
+      with:
+        file: ./app/coverage/lcov.info
+        flags: unittests
+        name: codecov-umbrella
+        fail_ci_if_error: false
+        token: ${{ secrets.CODECOV_TOKEN }}
 
     - name: Determine version increment
       id: version-increment
@@ -60,6 +86,7 @@ jobs:
         else
           echo "release=false" >> "$GITHUB_OUTPUT"
         fi
+        
     - name: Publish Release Status
       id: release-status
       run: |
@@ -70,9 +97,8 @@ jobs:
     - name: Publish Current Environment
       id: current-env
       run: |
-        export ENVIRONMENT=$(echo "${{ github.ref }}" | sed -e "s/refs\/heads\///g")
+        export ENVIRONMENT=$(echo "${{ github.ref }}" | sed -e "s/refs\\/heads\\///g")
         echo "ENV=${ENVIRONMENT}" >> "$GITHUB_OUTPUT"
-
 
     - name: Get current version
       id: get-version
@@ -99,8 +125,8 @@ jobs:
       name: Commit VERSION file to Dev
       with:
         add: 'VERSION'
-        author_name: 'Afraz Ahmed'
-        author_email: 'aphraz@live.com'
+        author_name: 'GitHub Actions'
+        author_email: 'action@github.com'
         fetch: false
         message: 'Updating VERSION file'
         pathspec_error_handling: ignore
@@ -112,18 +138,20 @@ jobs:
         ${{ steps.version-increment.outputs.release }} == 'true'
 
     - name: Login to DockerHub
-      uses: docker/login-action@v2
+      uses: docker/login-action@v3
       with:
         username: ${{ secrets.DOCKER_USERNAME }}
         password: ${{ secrets.DOCKER_PASSWORD }}
 
     - name: Docker Build and Push Dev
+      id: build-image
       run: |
         cd app
-        docker build -t ${{ secrets.DOCKER_USERNAME }}/node-app:${{ steps.updated-version.outputs.version }}-dev .
-        docker push ${{ secrets.DOCKER_USERNAME }}/node-app:${{ steps.updated-version.outputs.version }}-dev
+        IMAGE_TAG=${{ secrets.DOCKER_USERNAME }}/node-app:${{ steps.updated-version.outputs.version }}-dev
+        docker build -t $IMAGE_TAG .
+        docker push $IMAGE_TAG
+        echo "image-tag=$IMAGE_TAG" >> "$GITHUB_OUTPUT"
       if: github.ref == 'refs/heads/dev'
-
 
     - name: Docker Build and Push Staging
       run: |
@@ -189,17 +217,25 @@ jobs:
       AWS_DEFAULT_REGION: ${{ secrets.AWS_DEFAULT_REGION }}
       ENVIRONMENT: ${{ needs.build.outputs.currentENV }}
       TF_VAR_environment: ${{ needs.build.outputs.currentENV }}
+      NODE_VERSION: ${{ env.NODE_VERSION }}
 
     steps:
     - name: Checkout Code
-      uses: actions/checkout@v3
+      uses: actions/checkout@v4
+
+    - name: Setup Node.js
+      uses: actions/setup-node@v4
+      with:
+        node-version: ${{ env.NODE_VERSION }}
+        cache: 'npm'
+        cache-dependency-path: app/package-lock.json
 
     - name: Terraform CLI Setup
-      uses: hashicorp/setup-terraform@v2
+      uses: hashicorp/setup-terraform@v3
 
-    - name: Install AWS CLI
+    - name: Install AWS CLI v2
       run: |
-        curl -sLk "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
+        curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
         unzip awscliv2.zip
         sudo ./aws/install --update       
     
@@ -215,7 +251,7 @@ jobs:
 
     
     - name: Install Kubectl
-      uses: azure/setup-kubectl@v3
+      uses: azure/setup-kubectl@v4
       with:
         version: 'latest'
 
@@ -248,7 +284,6 @@ jobs:
         terraform apply -auto-approve tfplan
       if: ${{ steps.tf-plan-eks.outputs.exitcode == '2' }}
 
-
     - name: Create Namespace
       run: |
         NAMESPACE=app-${ENVIRONMENT}
@@ -258,7 +293,6 @@ jobs:
       run: |
         image=${{ secrets.DOCKER_USERNAME }}/node-app:${{ needs.build.outputs.currentVersion }}-${ENVIRONMENT}
         sed -i "s|image: .*$|image: ${image}|" kustomize/overlays/${ENVIRONMENT}/deploy-${ENVIRONMENT}.yaml
-
 
     - name: Install Kustomized Manifests
       id: kustomize-deploy
@@ -279,9 +313,8 @@ jobs:
       id: lb-hostname
       run: |
         kubectl -n ingress-nginx get svc ingress-nginx-controller \
-          -o jsonpath={'.status.loadBalancer.ingress[0].hostname'} > lb-hostname
+          -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' > lb-hostname
           echo -n "hostname=$(cat lb-hostname)" >> "$GITHUB_OUTPUT"
-    
     
     - name: Set DNS on Cloudflare
       uses: rez0n/create-dns-record@v2.1
@@ -310,3 +343,16 @@ jobs:
         SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK }}
         AS_VERSION: ${{ needs.build.outputs.currentVersion }}
         AS_DNS: "https://${{ needs.build.outputs.currentENV }}.afraz.dev"
+        
+    - name: Run security scan on deployed application
+      uses: aquasecurity/trivy-action@master
+      with:
+        image-ref: ${{ secrets.DOCKER_USERNAME }}/node-app:${{ needs.build.outputs.currentVersion }}-${{ needs.build.outputs.currentENV }}
+        format: 'sarif'
+        output: 'trivy-results.sarif'
+        
+    - name: Upload Trivy scan results
+      uses: github/codeql-action/upload-sarif@v3
+      if: always()
+      with:
+        sarif_file: 'trivy-results.sarif'
