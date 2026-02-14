@@ -46,18 +46,33 @@ module "vpc" {
 # ✅ EKS Cluster Module - Deploying an EKS Cluster with Managed Node Groups
 module "eks" {
   source  = "terraform-aws-modules/eks/aws"
-  version = "19.15.3"
+  version = "19.21.0"
 
   cluster_name    = local.cluster_name
-  cluster_version = "1.27"
+  cluster_version = "1.29"
 
   vpc_id                         = module.vpc.vpc_id
   subnet_ids                     = module.vpc.private_subnets
   cluster_endpoint_public_access = true
+  cluster_endpoint_private_access = true
+
+  # Enable EKS add-ons
+  cluster_addons = {
+    coredns = {
+      most_recent = true
+    }
+    kube-proxy = {
+      most_recent = true
+    }
+    vpc-cni = {
+      most_recent = true
+    }
+  }
 
   # Set default configurations for EKS managed nodes
   eks_managed_node_group_defaults = {
-    ami_type = "AL2_x86_64" # Amazon Linux 2 optimized for EKS
+    ami_type = "AL2_x86_64"
+    iam_role_attach_cni_policy = true
   }
 
   # Managed Node Group Configuration
@@ -71,11 +86,22 @@ module "eks" {
       max_size     = lookup(local.desired_instance_count, var.environment)
       desired_size = lookup(local.desired_instance_count, var.environment)
 
+      block_device_mappings = {
+        xvda = {
+          device_name = "/dev/xvda"
+          ebs = {
+            volume_size = 50
+            volume_type = "gp3"
+            encrypted   = true
+          }
+        }
+      }
+
       tags = {
-        "Environment"  = var.environment
-        "Terraform"    = "true"
-        "Kubernetes"   = "EKS"
-        "NodeGroup"    = "managed"
+        Environment = var.environment
+        Terraform   = "true"
+        Kubernetes  = "EKS"
+        NodeGroup   = "managed"
       }
     }
   }

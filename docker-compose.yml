@@ -5,11 +5,13 @@ services:
     build:
       context: ./app
       dockerfile: Dockerfile
+      target: development
     ports:
       - "3000:3000"
     environment:
       - NODE_ENV=development
       - PORT=3000
+      - LOG_LEVEL=debug
     volumes:
       - ./app:/app
       - /app/node_modules
@@ -20,17 +22,49 @@ services:
       timeout: 10s
       retries: 3
       start_period: 40s
+    networks:
+      - calculator-network
+    depends_on:
+      - redis
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    restart: unless-stopped
+    volumes:
+      - redis_data:/data
+    networks:
+      - calculator-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
 
   nginx:
     image: nginx:alpine
     ports:
       - "80:80"
+      - "443:443"
     volumes:
       - ./nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl:/etc/nginx/ssl:ro
     depends_on:
       - app
     restart: unless-stopped
+    networks:
+      - calculator-network
+    healthcheck:
+      test: ["CMD", "wget", "--quiet", "--tries=1", "--spider", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  redis_data:
+    driver: local
 
 networks:
-  default:
-    name: calculator-network
+  calculator-network:
+    driver: bridge

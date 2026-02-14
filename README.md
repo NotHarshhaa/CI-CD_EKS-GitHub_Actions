@@ -37,56 +37,40 @@ The repository is structured for **modularity and maintainability**:
 ```tree
 📂 root  
 ├── 📂 .github/workflows/      # GitHub Actions CI/CD workflows
-│   ├── ci.yml                 # Continuous Integration pipeline
-│   └── cd.yml                 # Continuous Deployment pipeline
+│   ├── ci.yml                 # Pure CI pipeline (testing, linting, security)
+│   ├── cd-production.yml      # Production deployment pipeline
+│   └── deployment.yml         # Multi-environment deployment with versioning
 │
 ├── 📂 app                     # Application source code  
-│   ├── app.py                 # Python application logic (Flask)  
 │   ├── calculator.js          # Business logic for calculations  
 │   ├── calculator.test.js     # Unit tests for calculator functions  
 │   ├── Dockerfile             # Optimized Dockerfile for Node.js app  
-│   ├── Dockerfile-python      # Dockerfile for Python Flask version  
 │   ├── index.js               # Main entry point of the Node.js application  
-│   ├── package.json           # Project dependencies and scripts  
-│   └── requirements.txt       # Python dependencies  
+│   └── package.json           # Project dependencies and scripts  
 │  
 ├── 📂 kustomize               # Kubernetes manifests managed with Kustomize  
 │   ├── 📂 base                # Base configurations common for all environments  
 │   │   ├── deploy.yaml        # Enhanced deployment with health checks & security  
 │   │   ├── ingress.yaml       # Ingress configuration for routing traffic  
-│   │   ├── kustomization.yaml # Kustomize configuration file  
+│   │   ├── kustomization.yaml # Kustomize configuration with image management  
 │   │   └── svc.yaml           # Kubernetes Service definition  
 │   │  
 │   ├── 📂 overlays            # Environment-specific configurations  
 │   │   ├── 📂 dev             # Dev environment-specific Kustomize configs  
-│   │   │   ├── deploy-dev.yaml        # Dev-specific deployment file  
-│   │   │   ├── ingress-dev.yaml       # Dev-specific ingress settings  
-│   │   │   ├── kustomization.yaml     # Kustomize configuration for Dev  
-│   │   │   └── svc-dev.yaml           # Dev-specific service settings  
-│   │   │  
-│   │   ├── 📂 prod            # Production environment-specific Kustomize configs  
-│   │   │   ├── deploy-prod.yaml       # Production-specific deployment file  
-│   │   │   ├── ingress-prod.yaml      # Production-specific ingress settings  
-│   │   │   ├── kustomization.yaml     # Kustomize configuration for Prod  
-│   │   │   └── svc-prod.yaml          # Production-specific service settings  
-│   │   │  
-│   │   ├── 📂 staging         # Staging environment-specific Kustomize configs  
-│   │   │   ├── deploy-staging.yaml    # Staging-specific deployment file  
-│   │   │   ├── ingress-staging.yaml   # Staging-specific ingress settings  
-│   │   │   ├── kustomization.yaml     # Kustomize configuration for Staging  
-│   │   │   └── svc-staging.yaml       # Staging-specific service settings  
+│   │   ├── 📂 prod            # Production environment with enhanced security  
+│   │   └── 📂 staging         # Staging environment-specific configs  
 │  
 ├── 📂 terraform               # Terraform configuration for infrastructure provisioning  
 │   ├── ingress-nginx.tf       # Terraform script for setting up NGINX Ingress  
-│   ├── main.tf                # Main Terraform file defining AWS infrastructure  
-│   ├── outputs.tf             # Defines Terraform outputs (e.g., cluster endpoints)  
-│   ├── terraform.tf           # Backend configuration for Terraform state management  
+│   ├── main.tf                # Main Terraform file with EKS 1.29 & enhanced security  
+│   ├── outputs.tf             # Defines Terraform outputs  
+│   ├── terraform.tf           # Backend configuration with latest providers  
 │   └── variables.tf           # Input variables for Terraform modules  
 │  
-├── .eslintrc.js               # ESLint configuration for code quality  
-├── .gitignore                 # Comprehensive gitignore file  
-├── docker-compose.yml         # Local development environment  
-├── nginx.conf                 # Nginx configuration for local development  
+├── .eslintrc.js               # Enhanced ESLint with security plugins  
+├── .gitignore                 # Optimized gitignore with comprehensive coverage  
+├── docker-compose.yml         # Enhanced local development with Redis & SSL  
+├── nginx.conf                 # Production-ready Nginx with security headers  
 ├── README.md                  # Project documentation and setup guide  
 └── VERSION                    # Tracks application versioning (Semantic Versioning)  
 ```
@@ -95,39 +79,43 @@ The repository is structured for **modularity and maintainability**:
 
 ## **🚀 Recent Improvements**  
 
-This project has been enhanced with the following improvements:
+This project has been comprehensively enhanced with modern best practices and security improvements:
 
-### **🔧 Application Enhancements**
-- ✅ **Enhanced Error Handling** - Better error responses and graceful shutdown
-- ✅ **Health Check Endpoints** - `/health` endpoint for monitoring
-- ✅ **API Endpoints** - RESTful API at `/api/calculate` for programmatic access
-- ✅ **CORS Support** - Cross-origin resource sharing enabled
-- ✅ **Improved UI** - Better styling and user experience
-- ✅ **Graceful Shutdown** - Proper signal handling for container orchestration
+### **🔄 GitHub Actions Workflows**
+- ✅ **Organized Workflow Structure** - Clear separation: CI, Production CD, Multi-Environment Deployment
+- ✅ **Pure CI Pipeline** - Testing, linting, security scanning (ci.yml)
+- ✅ **Production CD** - ECR integration, production deployment (cd-production.yml)
+- ✅ **Multi-Environment Deployment** - Version management, Terraform, DNS (deployment.yml)
+- ✅ **Latest Action Versions** - checkout@v4, setup-node@v4, codecov@v4
+- ✅ **Enhanced CI Pipeline** - Multi-node testing (18.x, 20.x) with fail-fast disabled
+- ✅ **Security Scanning** - Trivy vulnerability scanning with SARIF upload
+- ✅ **Master Branch Support** - Updated workflows to use master branch instead of main
 
-### **🐳 Docker & Security Improvements**
-- ✅ **Multi-stage Docker Build** - Optimized image size and security
-- ✅ **Non-root User** - Enhanced security with proper user permissions
-- ✅ **Health Checks** - Built-in container health monitoring
-- ✅ **Signal Handling** - Proper process management with dumb-init
+### **🏗️ Terraform Infrastructure**
+- ✅ **EKS 1.29** - Latest stable version with enhanced add-ons
+- ✅ **Modern Providers** - AWS ~>5.50, Kubernetes ~>2.24, Helm ~>2.12
+- ✅ **Enhanced Security** - Encrypted GP3 volumes, private endpoints, CNI policies
+- ✅ **Better Tagging** - Comprehensive resource tagging strategy
+- ✅ **Version Constraints** - Terraform >=1.5.0 with provider version locking
 
-### **☸️ Kubernetes Enhancements**
-- ✅ **Liveness & Readiness Probes** - Better container health monitoring
-- ✅ **Security Context** - Enhanced security with non-root execution
-- ✅ **Resource Management** - Proper CPU and memory limits
-- ✅ **Rolling Updates** - Zero-downtime deployments
+### **📦 Kustomize Configurations**
+- ✅ **Image Management** - Centralized image tagging and updates
+- ✅ **Enhanced Production** - 3 replicas, proper secret management, environment configs
+- ✅ **Better Structure** - Improved base configuration with replica management
+- ✅ **Secret Handling** - Environment-based secret generation
 
-### **🔄 CI/CD Pipeline**
-- ✅ **GitHub Actions Workflows** - Automated CI/CD with security scanning
-- ✅ **Multi-Node Testing** - Testing across Node.js 18.x and 20.x
-- ✅ **Security Scanning** - Trivy vulnerability scanning
-- ✅ **Code Quality** - ESLint integration and coverage reporting
+### **🐳 Docker & Development**
+- ✅ **Redis Cache** - Added Redis service for improved performance
+- ✅ **SSL Support** - HTTPS termination with modern cipher suites
+- ✅ **Enhanced Nginx** - Security headers, rate limiting, gzip compression
+- ✅ **Health Checks** - Comprehensive health monitoring for all services
+- ✅ **Better Networking** - Dedicated bridge network and volume management
 
-### **🛠️ Development Tools**
-- ✅ **Docker Compose** - Local development environment
-- ✅ **ESLint Configuration** - Code quality and consistency
-- ✅ **Comprehensive .gitignore** - Proper version control
-- ✅ **Nginx Configuration** - Local reverse proxy setup
+### **🔧 Development Tools**
+- ✅ **Security ESLint** - Security plugins, import rules, promise handling
+- ✅ **Optimized Gitignore** - Clean, organized, comprehensive coverage
+- ✅ **Code Quality** - ES2022 standards, security-focused linting
+- ✅ **Modern Standards** - Latest Node.js 20 with proper caching
 
 ---
 
@@ -135,14 +123,15 @@ This project has been enhanced with the following improvements:
 
 Before you proceed, ensure you have the following installed:  
 
-- 🛠 **Node.js (>=18.x)**  
+- 🛠 **Node.js (>=20.x)**  
 - 🐳 **Docker & Docker Compose**  
-- 🏗️ **Terraform (>=1.0)**  
+- 🏗️ **Terraform (>=1.5.0)**  
 - ☸ **kubectl (latest version)**  
 - 🎭 **Kustomize**  
 - ☁ **AWS CLI & eksctl**  
 - ⚙️ **GitHub Actions configured**  
 - 🔑 **AWS IAM permissions to manage EKS**  
+- 🔒 **Security scanning tools (Trivy, CodeQL)**  
 
 ---
 
@@ -185,29 +174,57 @@ npm run lint
 
 ## **⚙️ CI/CD Workflow**  
 
-The **CI/CD pipeline** automates the entire deployment process using **GitHub Actions**.  
+The **CI/CD pipeline** is organized into three specialized workflows using **GitHub Actions**:  
 
-### **🔨 Build Job**  
+### **� CI Pipeline (ci.yml)**  
+**Triggers**: Push/PR to master, develop, staging  
 
-1️⃣ **Set Up the Environment**  
+1️⃣ **Code Quality Checks**  
+- Install **Node.js dependencies** using `npm ci`  
+- Run **linting** to ensure code quality standards  
 
-- Install **Node.js dependencies** using `npm install`.  
-- Lint the code to ensure quality standards.  
+2️⃣ **Testing & Coverage**  
+- Execute **unit tests** across Node.js 18.x and 20.x  
+- Generate **coverage reports** with Codecov integration  
 
-2️⃣ **Run Tests**  
+3️⃣ **Security Scanning**  
+- Run **Trivy vulnerability scanner** on codebase  
+- Upload **SARIF results** to GitHub Security tab  
 
-- Execute **unit tests** with `npm test`.  
-- Generate test reports for visibility.  
+### **🚀 Production CD Pipeline (cd-production.yml)**  
+**Triggers**: Push to master, tags, manual dispatch  
 
-3️⃣ **Version Management**  
+1️⃣ **Build & Push**  
+- **Build Docker image** with production optimizations  
+- Push to **Amazon ECR** with SHA tagging  
 
-- Uses **Semantic Versioning** (`major.minor.patch`).  
-- Auto-increments the version based on commit messages.  
+2️⃣ **Deploy to EKS**  
+- Update **Kubernetes manifests** using Kustomize  
+- Deploy to **production EKS cluster**  
 
-4️⃣ **Build & Push Docker Image**  
+3️⃣ **Verification**  
+- **Health checks** and smoke tests  
+- **Security scanning** of deployed image  
 
-- **Builds a Docker image** of the application.  
-- Pushes it to **Amazon Elastic Container Registry (ECR)**.  
+### **🌍 Multi-Environment Deployment (deployment.yml)**  
+**Triggers**: Push to prod/dev/staging, PR to dev  
+
+1️⃣ **Version Management**  
+- **Semantic versioning** based on commit messages  
+- Auto-tag and version file updates  
+
+2️⃣ **Infrastructure Provisioning**  
+- **Terraform** EKS cluster management  
+- Multi-environment infrastructure setup  
+
+3️⃣ **Application Deployment**  
+- **Docker builds** for each environment  
+- **Kustomize** deployments with environment-specific configs  
+- **DNS management** via Cloudflare  
+
+4️⃣ **Notifications**  
+- **Slack integration** for deployment status  
+- Comprehensive deployment reporting  
 
 ---
 

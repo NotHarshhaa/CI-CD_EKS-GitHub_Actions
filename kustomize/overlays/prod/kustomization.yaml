@@ -13,14 +13,28 @@ patchesStrategicMerge:
 
 configMapGenerator:
 - name: app-prod-config
-  files:
-  - config/app-config.yaml  # Ensure this file exists in your repo
+  literals:
+  - ENV=production
+  - LOG_LEVEL=warn
+  - PORT=3000
   options:
-    disableNameSuffixHash: true
+    disableNameSuffixHash: false
 
 secretGenerator:
 - name: app-prod-secrets
-  files:
-  - secrets/db-password.txt  # Ensure this file exists and is encrypted properly
+  envs:
+  - secrets.env
   options:
-    disableNameSuffixHash: true
+    disableNameSuffixHash: false
+
+replicas:
+- name: web-deployment
+  count: 3
+
+images:
+- name: aphraz/node-app
+  newTag: production
+
+commonLabels:
+  environment: production
+  tier: application

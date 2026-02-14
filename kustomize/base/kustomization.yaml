@@ -2,18 +2,28 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
 resources:
-  - deploy.yaml
-  - svc.yaml
-  - ingress.yaml
+- deploy.yaml
+- svc.yaml
+- ingress.yaml
 
-namespace: default  # Ensures all resources are deployed to the correct namespace
+namespace: default
 
 configMapGenerator:
-  - name: app-config
-    literals:
-      - ENV=production
-      - LOG_LEVEL=info
+- name: app-config
+  literals:
+  - ENV=production
+  - LOG_LEVEL=info
+  - PORT=3000
 
 commonLabels:
   app: web
   environment: production
+  version: v1
+
+images:
+- name: aphraz/node-app
+  newTag: latest
+
+replicas:
+- name: web-deployment
+  count: 1

@@ -1,30 +1,50 @@
 terraform {
   backend "s3" {
-    bucket         = "my-terraform-state-bucket"  # ✅ Replace with your actual S3 bucket name
-    key            = "terraform/state.tfstate"    # ✅ Define the path for storing the state file
+    bucket         = "my-terraform-state-bucket"
+    key            = "terraform/state.tfstate"
     region         = "ap-southeast-1"
-    encrypt        = true                          # ✅ Enable encryption for security
-    dynamodb_table = "terraform-lock"             # ✅ Replace with your DynamoDB table for state locking
+    encrypt        = true
+    dynamodb_table = "terraform-lock"
   }
 
   required_providers {
     aws = {
       source  = "hashicorp/aws"
-      version = "~> 5.14.0"
+      version = "~> 5.50"
     }
 
     random = {
       source  = "hashicorp/random"
-      version = "~> 3.5.1"
+      version = "~> 3.6"
     }
 
     tls = {
       source  = "hashicorp/tls"
-      version = "~> 4.0.4"
+      version = "~> 4.2"
+    }
+
+    kubernetes = {
+      source  = "hashicorp/kubernetes"
+      version = "~> 2.24"
+    }
+
+    helm = {
+      source  = "hashicorp/helm"
+      version = "~> 2.12"
     }
   }
+
+  required_version = ">= 1.5.0"
 }
 
 provider "aws" {
-  region = "ap-southeast-1"
+  region = var.region
+  
+  default_tags {
+    tags = {
+      Environment = var.environment
+      Project     = "CI-CD-EKS"
+      ManagedBy   = "Terraform"
+    }
+  }
 }
