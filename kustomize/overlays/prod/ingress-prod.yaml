@@ -3,32 +3,22 @@ kind: Ingress
 metadata:
   name: e2ecicd-ingress
   annotations:
-    nginx.ingress.kubernetes.io/rewrite-target: /
-    nginx.ingress.kubernetes.io/ssl-redirect: "true"  # Force HTTPS
-    nginx.ingress.kubernetes.io/proxy-body-size: "10m"  # Allow larger payloads
-    nginx.ingress.kubernetes.io/proxy-buffering: "on"  # Enable response buffering
-    nginx.ingress.kubernetes.io/proxy-read-timeout: "60"  # Increase timeout
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
+    nginx.ingress.kubernetes.io/proxy-buffering: "on"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "60"
 spec:
-  ingressClassName: nginx
   tls:
-  - hosts:
-    - prod.afraz.dev
-    secretName: tls-prod-secret  # Ensure you create this secret for SSL
+    - hosts:
+        - prod.afraz.dev
+      secretName: tls-prod-secret  # Create this TLS secret for HTTPS
   rules:
-  - host: prod.afraz.dev
-    http:
-      paths:
-      - path: /
-        pathType: Prefix
-        backend:
-          service:
-            name: web-service
-            port:
-              number: 80
-      - path: /api
-        pathType: Prefix
-        backend:
-          service:
-            name: api-service
-            port:
-              number: 8080
+    - host: prod.afraz.dev
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: web-service
+                port:
+                  number: 80

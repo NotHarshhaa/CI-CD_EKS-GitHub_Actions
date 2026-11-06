@@ -3,23 +3,20 @@ kind: Ingress
 metadata:
   name: e2ecicd-ingress
   annotations:
-    nginx.ingress.kubernetes.io/rewrite-target: /
-    nginx.ingress.kubernetes.io/ssl-redirect: "true"  # Redirects HTTP to HTTPS
-    nginx.ingress.kubernetes.io/proxy-body-size: "50m"  # Increases request body size limit
+    nginx.ingress.kubernetes.io/proxy-body-size: "10m"
 spec:
-  ingressClassName: nginx
   tls:
-  - hosts:
-      - staging.afraz.dev
-    secretName: staging-tls-secret  # TLS secret for HTTPS
+    - hosts:
+        - staging.afraz.dev
+      secretName: staging-tls-secret  # Create this TLS secret for HTTPS
   rules:
-  - host: staging.afraz.dev
-    http:
-      paths:
-      - path: /
-        pathType: Prefix
-        backend:
-          service:
-            name: web-service
-            port:
-              number: 80
+    - host: staging.afraz.dev
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: web-service
+                port:
+                  number: 80

@@ -1,49 +1,54 @@
-# Use a multi-stage build to keep the final image lightweight
-FROM node:18-alpine AS builder
+# syntax=docker/dockerfile:1
 
-# Set working directory
+# ---- Base: shared dependency manifest -------------------------------
+FROM node:22-alpine AS base
+
 WORKDIR /app
 
-# Copy package files first (to leverage Docker cache)
 COPY package*.json ./
 
-# Install dependencies with production flag and clean cache
-RUN npm ci --only=production && npm cache clean --force
+# ---- Development: all deps (incl. nodemon) for docker-compose ------
+FROM base AS development
 
-# Copy application source code
+RUN npm ci
+
 COPY . .
 
-# Production stage
-FROM node:18-alpine AS production
+EXPOSE 3000
 
-# Install dumb-init for proper signal handling
+CMD ["npm", "run", "dev"]
+
+# ---- Dependencies: production-only dependency tree -----------------
+FROM base AS dependencies
+
+RUN npm ci --omit=dev && npm cache clean --force
+
+# ---- Production: minimal runtime image ------------------------------
+FROM node:22-alpine AS production
+
+# dumb-init forwards signals correctly as PID 1
 RUN apk add --no-cache dumb-init
 
-# Create app directory
 WORKDIR /app
 
-# Create non-root user for security
+# Non-root user for security
 RUN addgroup -g 1001 -S nodejs && \
     adduser -S nodejs -u 1001
 
-# Copy node_modules from builder stage
-COPY --from=builder --chown=nodejs:nodejs /app/node_modules ./node_modules
+COPY --from=dependencies --chown=nodejs:nodejs /app/node_modules ./node_modules
 
-# Copy application code
 COPY --chown=nodejs:nodejs . .
 
-# Switch to non-root user
+ENV NODE_ENV=production \
+    PORT=3000
+
 USER nodejs
 
-# Expose the port
 EXPOSE 3000
 
-# Add health check
 HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
   CMD node -e "require('http').get('http://localhost:3000/health', (res) => { process.exit(res.statusCode === 200 ? 0 : 1) })"
 
-# Use dumb-init to handle signals properly
 ENTRYPOINT ["dumb-init", "--"]
 
-# Run the app
 CMD ["node", "index.js"]

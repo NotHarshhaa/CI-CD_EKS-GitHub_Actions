@@ -38,19 +38,21 @@ The repository is structured for **modularity and maintainability**:
 📂 root  
 ├── 📂 .github/workflows/      # GitHub Actions CI/CD workflows
 │   ├── ci.yml                 # Pure CI pipeline (testing, linting, security)
-│   ├── cd-production.yml      # Production deployment pipeline
+│   ├── cd-production.yml      # Production deployment pipeline (ECR → EKS)
 │   └── deployment.yml         # Multi-environment deployment with versioning
 │
 ├── 📂 app                     # Application source code  
+│   ├── .eslintrc.js           # ESLint config with security plugins  
 │   ├── calculator.js          # Business logic for calculations  
 │   ├── calculator.test.js     # Unit tests for calculator functions  
-│   ├── Dockerfile             # Optimized Dockerfile for Node.js app  
-│   ├── index.js               # Main entry point of the Node.js application  
-│   └── package.json           # Project dependencies and scripts  
+│   ├── index.js               # Main entry point (HTTP server)  
+│   ├── index.test.js          # HTTP integration tests  
+│   ├── package.json           # Project dependencies and scripts  
+│   └── package-lock.json      # Locked dependencies (required by npm ci)  
 │  
 ├── 📂 kustomize               # Kubernetes manifests managed with Kustomize  
 │   ├── 📂 base                # Base configurations common for all environments  
-│   │   ├── deploy.yaml        # Enhanced deployment with health checks & security  
+│   │   ├── deploy.yaml        # Deployment with health checks & security context  
 │   │   ├── ingress.yaml       # Ingress configuration for routing traffic  
 │   │   ├── kustomization.yaml # Kustomize configuration with image management  
 │   │   └── svc.yaml           # Kubernetes Service definition  
@@ -62,14 +64,13 @@ The repository is structured for **modularity and maintainability**:
 │  
 ├── 📂 terraform               # Terraform configuration for infrastructure provisioning  
 │   ├── ingress-nginx.tf       # Terraform script for setting up NGINX Ingress  
-│   ├── main.tf                # Main Terraform file with EKS 1.29 & enhanced security  
+│   ├── main.tf                # Main Terraform file with EKS 1.31 & enhanced security  
 │   ├── outputs.tf             # Defines Terraform outputs  
-│   ├── terraform.tf           # Backend configuration with latest providers  
+│   ├── terraform.tf           # Backend configuration with S3-native locking  
 │   └── variables.tf           # Input variables for Terraform modules  
 │  
-├── .eslintrc.js               # Enhanced ESLint with security plugins  
 ├── .gitignore                 # Optimized gitignore with comprehensive coverage  
-├── docker-compose.yml         # Enhanced local development with Redis & SSL  
+├── docker-compose.yml         # Local development (app + Redis, optional TLS proxy)  
 ├── nginx.conf                 # Production-ready Nginx with security headers  
 ├── README.md                  # Project documentation and setup guide  
 └── VERSION                    # Tracks application versioning (Semantic Versioning)  
@@ -86,36 +87,39 @@ This project has been comprehensively enhanced with modern best practices and se
 - ✅ **Pure CI Pipeline** - Testing, linting, security scanning (ci.yml)
 - ✅ **Production CD** - ECR integration, production deployment (cd-production.yml)
 - ✅ **Multi-Environment Deployment** - Version management, Terraform, DNS (deployment.yml)
-- ✅ **Latest Action Versions** - checkout@v4, setup-node@v4, codecov@v4
-- ✅ **Enhanced CI Pipeline** - Multi-node testing (18.x, 20.x) with fail-fast disabled
+- ✅ **Explicit Permissions** - Least-privilege GITHUB_TOKEN scopes per workflow
+- ✅ **Concurrency Guards** - No overlapping deployments for the same target
+- ✅ **Pinned Action Versions** - Trivy pinned to a release instead of @master
+- ✅ **Enhanced CI Pipeline** - Multi-node testing (20.x, 22.x) with fail-fast disabled
 - ✅ **Security Scanning** - Trivy vulnerability scanning with SARIF upload
-- ✅ **Master Branch Support** - Updated workflows to use master branch instead of main
 
 ### **🏗️ Terraform Infrastructure**
-- ✅ **EKS 1.29** - Latest stable version with enhanced add-ons
+- ✅ **EKS 1.31** - Supported Kubernetes version with enhanced add-ons
 - ✅ **Modern Providers** - AWS ~>5.50, Kubernetes ~>2.24, Helm ~>2.12
+- ✅ **S3-Native State Locking** - No deprecated DynamoDB lock table (Terraform >=1.10)
 - ✅ **Enhanced Security** - Encrypted GP3 volumes, private endpoints, CNI policies
 - ✅ **Better Tagging** - Comprehensive resource tagging strategy
-- ✅ **Version Constraints** - Terraform >=1.5.0 with provider version locking
 
 ### **📦 Kustomize Configurations**
-- ✅ **Image Management** - Centralized image tagging and updates
-- ✅ **Enhanced Production** - 3 replicas, proper secret management, environment configs
-- ✅ **Better Structure** - Improved base configuration with replica management
-- ✅ **Secret Handling** - Environment-based secret generation
+- ✅ **Image Management** - Single `node-app` placeholder, updated via `kustomize edit set image`
+- ✅ **Modern Syntax** - `patches` + `labels` (v5-compatible, no deprecated fields)
+- ✅ **Safe Overlays** - No selector/label conflicts; container resources patched per env
+- ✅ **Wired ConfigMaps** - Generated app-config is mounted via `envFrom` (hashed → auto rollout)
+- ✅ **No Committed Secrets** - Secrets provisioned out-of-band, never via kustomize generators
 
 ### **🐳 Docker & Development**
-- ✅ **Redis Cache** - Added Redis service for improved performance
-- ✅ **SSL Support** - HTTPS termination with modern cipher suites
-- ✅ **Enhanced Nginx** - Security headers, rate limiting, gzip compression
-- ✅ **Health Checks** - Comprehensive health monitoring for all services
-- ✅ **Better Networking** - Dedicated bridge network and volume management
+- ✅ **Node 22 Alpine** - Supported LTS base images (dev & prod stages)
+- ✅ **Multi-Stage Builds** - `development` target for compose, `production` for deploys
+- ✅ **Optional TLS Proxy** - nginx runs under a compose profile with self-signed dev certs
+- ✅ **Health Checks** - Application, Redis, and nginx (HTTPS-aware) healthchecks
+- ✅ **Request Body Limits** - 10 KB limit in the app protects against oversized payloads
 
-### **🔧 Development Tools**
-- ✅ **Security ESLint** - Security plugins, import rules, promise handling
-- ✅ **Optimized Gitignore** - Clean, organized, comprehensive coverage
-- ✅ **Code Quality** - ES2022 standards, security-focused linting
-- ✅ **Modern Standards** - Latest Node.js 20 with proper caching
+### **🔧 Application & Code Quality**
+- ✅ **XSS-Safe Output** - All user input HTML-escaped before rendering
+- ✅ **Strict Input Validation** - Integers only; `12abc`, `3.5`, `1e3` are rejected
+- ✅ **98%+ Test Coverage** - Unit + HTTP integration tests (28 tests, 80% threshold enforced)
+- ✅ **Security ESLint** - security/import/promise plugins with eslintrc-legacy config
+- ✅ **Graceful Shutdown** - SIGTERM/SIGINT handling for zero-downtime rollouts
 
 ---
 
@@ -123,15 +127,30 @@ This project has been comprehensively enhanced with modern best practices and se
 
 Before you proceed, ensure you have the following installed:  
 
-- 🛠 **Node.js (>=20.x)**  
+- 🛠 **Node.js (>=20.x, LTS recommended)**  
 - 🐳 **Docker & Docker Compose**  
-- 🏗️ **Terraform (>=1.5.0)**  
+- 🏗️ **Terraform (>=1.10.0 — required for S3-native state locking)**  
 - ☸ **kubectl (latest version)**  
 - 🎭 **Kustomize**  
 - ☁ **AWS CLI & eksctl**  
 - ⚙️ **GitHub Actions configured**  
 - 🔑 **AWS IAM permissions to manage EKS**  
 - 🔒 **Security scanning tools (Trivy, CodeQL)**  
+
+---
+
+## **🔑 Required GitHub Secrets**  
+
+| Secret | Used by | Purpose |
+|--------|---------|---------|
+| `AWS_ACCESS_KEY_ID` / `AWS_SECRET_ACCESS_KEY` | cd-production, deployment | AWS credentials (EKS, ECR, Terraform) |
+| `S3_BUCKET` / `S3_REGION` | deployment | Terraform state backend |
+| `DOCKER_USERNAME` / `DOCKER_PASSWORD` | deployment | Docker Hub image pushes |
+| `CLOUDFLARE_TOKEN` / `CLOUDFLARE_ZONE` / `CLOUDFLARE_DOMAIN` | deployment | DNS record automation |
+| `SLACK_WEBHOOK` | deployment | Deployment notifications |
+| `CODECOV_TOKEN` | ci, deployment | Coverage report upload (optional) |
+
+> 💡 For production, prefer GitHub OIDC (`id-token: write` + an IAM role ARN) over long-lived AWS access keys.
 
 ---
 
@@ -143,13 +162,19 @@ Before you proceed, ensure you have the following installed:
 git clone https://github.com/NotHarshhaa/CI-CD_EKS-GitHub_Actions.git
 cd CI-CD_EKS-GitHub_Actions
 
-# Start the application with Docker Compose
-docker-compose up --build
+# Start the application (app + Redis)
+docker compose up --build
 
 # Access the application
-# Web UI: http://localhost:80
-# Health Check: http://localhost:80/health
-# API: POST http://localhost:80/api/calculate
+# Web UI:   http://localhost:3000
+# Health:   http://localhost:3000/health
+# API:      POST http://localhost:3000/api/calculate  (body: numbers=1,2,3)
+
+# Optional: TLS-terminating nginx proxy (self-signed dev certs)
+mkdir -p ssl && openssl req -x509 -nodes -days 365 -newkey rsa:2048 \
+  -keyout ssl/key.pem -out ssl/cert.pem -subj "/CN=localhost"
+docker compose --profile proxy up
+# Then: https://localhost/health
 ```
 
 ### **Option 2: Local Node.js Development**
@@ -261,25 +286,21 @@ The **CI/CD pipeline** is organized into three specialized workflows using **Git
 | Environment | Instance Type | Replica Count |
 |-------------|--------------|---------------|
 | **Dev**     | `t3.small`    | 1             |
-| **Staging** | `t3.medium`   | 3             |
+| **Staging** | `t3.medium`   | 2             |
 | **Prod**    | `t3.large`    | 3             |
 
 ✅ **DNS Automation via Cloudflare**  
 
-- Environment-specific subdomains:  
-  - `dev.example.com`  
-  - `staging.example.com`  
-  - `prod.example.com`  
+- Environment-specific subdomains (set your domain in the `CLOUDFLARE_DOMAIN` secret):  
+  - `dev.<your-domain>`  
+  - `staging.<your-domain>`  
+  - `prod.<your-domain>`  
 
 ---
 
 ## **📦 Application Deployment Strategy**  
 
-This project supports **multiple deployment strategies**:  
-
-✅ **Rolling Updates** – Default strategy, ensuring zero downtime.  
-✅ **Blue-Green Deployment** – Used in production environments.  
-✅ **Canary Deployments** – Gradual rollout for safe updates.  
+✅ **Rolling Updates** – `maxUnavailable: 0` + readiness/liveness probes for zero-downtime rollouts.  
 
 ---
 

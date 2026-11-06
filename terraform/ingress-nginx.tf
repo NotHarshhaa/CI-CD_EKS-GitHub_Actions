@@ -12,6 +12,11 @@ provider "helm" {
 
 # Updates the kubeconfig to interact with the EKS cluster
 resource "null_resource" "update_kubeconfig" {
+  # Re-run when the control plane endpoint changes (e.g. cluster recreation)
+  triggers = {
+    cluster_endpoint = module.eks.cluster_endpoint
+  }
+
   provisioner "local-exec" {
     command = "aws eks --region ${var.region} update-kubeconfig --name ${local.cluster_name}"
   }

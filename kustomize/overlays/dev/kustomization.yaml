@@ -1,16 +1,31 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
-namespace: app-dev  # Explicit namespace definition
+namespace: app-dev
 
 resources:
   - ../../base
 
-patchesStrategicMerge:
-  - deploy-dev.yaml
-  - svc-dev.yaml
-  - ingress-dev.yaml
+patches:
+  - path: deploy-dev.yaml
+  - path: ingress-dev.yaml
 
-commonLabels:
-  environment: dev
-  app: my-node-app
+labels:
+  - includeSelectors: false
+    pairs:
+      environment: dev
+
+images:
+  - name: node-app
+    newTag: latest
+
+replicas:
+  - name: web-deployment
+    count: 1
+
+configMapGenerator:
+  - name: app-config
+    behavior: merge
+    literals:
+      - ENV=development
+      - LOG_LEVEL=debug

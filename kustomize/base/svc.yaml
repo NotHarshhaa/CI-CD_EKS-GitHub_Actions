@@ -4,7 +4,6 @@ metadata:
   name: web-service
   labels:
     app: web
-    environment: production
 spec:
   selector:
     app: web
@@ -12,5 +11,5 @@ spec:
     - name: http
       protocol: TCP
       port: 80
-      targetPort: 3000
-  type: ClusterIP  # Change to LoadBalancer or NodePort if needed
+      targetPort: http
+  type: ClusterIP  # Traffic enters via the NGINX ingress controller's LoadBalancer

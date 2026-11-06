@@ -3,19 +3,19 @@ name: Multi-Environment Deployment Pipeline
 on:
   pull_request:
     types:
-    - closed
+      - closed
     paths-ignore:
-    - 'VERSION'
+      - 'VERSION'
     branches:
-    - dev
+      - dev
   push:
     branches:
-    - prod
-    - dev
-    - staging
+      - prod
+      - dev
+      - staging
     paths-ignore:
-    - 'VERSION'
-    - 'README.md'
+      - 'VERSION'
+      - 'README.md'
   workflow_dispatch:
 
 permissions:
@@ -23,15 +23,19 @@ permissions:
   id-token: write
   security-events: write
 
+concurrency:
+  group: deployment-${{ github.ref }}
+  cancel-in-progress: false
+
 env:
-  NODE_VERSION: 20
+  NODE_VERSION: '22'
   AWS_REGION: us-west-2
 
 jobs:
   build:
     runs-on: ubuntu-latest
     outputs:
-      releaseTrue: ${{steps.release-status.outputs.rel-status}}
+      releaseTrue: ${{ steps.release-status.outputs.rel-status }}
       currentVersion: ${{ steps.updated-version.outputs.version }}
       currentENV: ${{ steps.current-env.outputs.ENV }}
       imageTag: ${{ steps.build-image.outputs.image-tag }}
@@ -59,7 +63,7 @@ jobs:
     - name: Run Tests
       run: |
         cd app
-        npm test -- --coverage
+        npm test
 
     - name: Upload coverage reports
       uses: codecov/codecov-action@v4
@@ -74,31 +78,28 @@ jobs:
       id: version-increment
       run: |
         commit_message=$(git log -1 --pretty=%B)
+        release=false
+        increment=''
         if [[ "$commit_message" == *"major:"* ]]; then
-          echo "increment=major" >> "$GITHUB_OUTPUT"
-          echo "release=true" >> "$GITHUB_OUTPUT"
-        elif [[ "$commit_message" == "minor:"* ]]; then
-          echo "increment=minor" >> "$GITHUB_OUTPUT"
-          echo "release=true" >> "$GITHUB_OUTPUT"
-        elif [[ "$commit_message" == "patch:"* ]]; then
-          echo "increment=patch" >> "$GITHUB_OUTPUT"
-          echo "release=true" >> "$GITHUB_OUTPUT"
-        else
-          echo "release=false" >> "$GITHUB_OUTPUT"
+          increment=major
+          release=true
+        elif [[ "$commit_message" == *"minor:"* ]]; then
+          increment=minor
+          release=true
+        elif [[ "$commit_message" == *"patch:"* ]]; then
+          increment=patch
+          release=true
         fi
-        
+        echo "increment=$increment" >> "$GITHUB_OUTPUT"
+        echo "release=$release" >> "$GITHUB_OUTPUT"
+
     - name: Publish Release Status
       id: release-status
-      run: |
-        echo "rel-status=${{ env.release }}" >> "$GITHUB_OUTPUT"
-      env:
-        release: ${{ steps.version-increment.outputs.release }}
+      run: echo "rel-status=${{ steps.version-increment.outputs.release }}" >> "$GITHUB_OUTPUT"
 
     - name: Publish Current Environment
       id: current-env
-      run: |
-        export ENVIRONMENT=$(echo "${{ github.ref }}" | sed -e "s/refs\\/heads\\///g")
-        echo "ENV=${ENVIRONMENT}" >> "$GITHUB_OUTPUT"
+      run: echo "ENV=${GITHUB_REF_NAME}" >> "$GITHUB_OUTPUT"
 
     - name: Get current version
       id: get-version
@@ -106,23 +107,34 @@ jobs:
 
     - name: Increment version
       id: increment-version
-      run: echo "new_version=$(docker run --rm -v ${PWD}:/app treeder/bump ${{ steps.version-increment.outputs.increment }})" >> "$GITHUB_OUTPUT"
+      env:
+        CURRENT_VERSION: ${{ steps.get-version.outputs.version }}
+        INCREMENT: ${{ steps.version-increment.outputs.increment }}
+      run: |
+        IFS='.' read -r major minor patch <<< "$CURRENT_VERSION"
+        case "$INCREMENT" in
+          major) NEW_VERSION="$((major + 1)).0.0" ;;
+          minor) NEW_VERSION="$major.$((minor + 1)).0" ;;
+          patch) NEW_VERSION="$major.$minor.$((patch + 1))" ;;
+          *) echo "::error::Unknown increment: $INCREMENT"; exit 1 ;;
+        esac
+        echo "new_version=$NEW_VERSION" >> "$GITHUB_OUTPUT"
       if: |
-        github.ref == 'refs/heads/dev' && 
-        ${{ steps.version-increment.outputs.release }} == 'true'
+        github.ref == 'refs/heads/dev' &&
+        steps.version-increment.outputs.release == 'true'
 
     - name: Update VERSION file
       run: echo "${{ steps.increment-version.outputs.new_version }}" > VERSION
       if: |
         github.ref == 'refs/heads/dev' &&
-        ${{ steps.version-increment.outputs.release }} == 'true'
+        steps.version-increment.outputs.release == 'true'
 
     - name: Get updated version
       id: updated-version
       run: echo "version=$(cat VERSION)" >> "$GITHUB_OUTPUT"
 
-    - uses: EndBug/add-and-commit@v9
-      name: Commit VERSION file to Dev
+    - name: Commit VERSION file to Dev
+      uses: EndBug/add-and-commit@v9
       with:
         add: 'VERSION'
         author_name: 'GitHub Actions'
@@ -131,11 +143,11 @@ jobs:
         message: 'Updating VERSION file'
         pathspec_error_handling: ignore
         push: origin dev --force
-        tag: "${{ steps.updated-version.outputs.version }} --force"
+        tag: ${{ steps.updated-version.outputs.version }}
         tag_push: '--force'
       if: |
         github.ref == 'refs/heads/dev' &&
-        ${{ steps.version-increment.outputs.release }} == 'true'
+        steps.version-increment.outputs.release == 'true'
 
     - name: Login to DockerHub
       uses: docker/login-action@v3
@@ -147,24 +159,26 @@ jobs:
       id: build-image
       run: |
         cd app
-        IMAGE_TAG=${{ secrets.DOCKER_USERNAME }}/node-app:${{ steps.updated-version.outputs.version }}-dev
-        docker build -t $IMAGE_TAG .
-        docker push $IMAGE_TAG
+        IMAGE_TAG="${{ secrets.DOCKER_USERNAME }}/node-app:${{ steps.updated-version.outputs.version }}-dev"
+        docker build --target production -t "$IMAGE_TAG" .
+        docker push "$IMAGE_TAG"
         echo "image-tag=$IMAGE_TAG" >> "$GITHUB_OUTPUT"
       if: github.ref == 'refs/heads/dev'
 
     - name: Docker Build and Push Staging
       run: |
         cd app
-        docker build -t ${{ secrets.DOCKER_USERNAME }}/node-app:${{ steps.updated-version.outputs.version }}-staging .
-        docker push ${{ secrets.DOCKER_USERNAME }}/node-app:${{ steps.updated-version.outputs.version }}-staging
+        IMAGE_TAG="${{ secrets.DOCKER_USERNAME }}/node-app:${{ steps.updated-version.outputs.version }}-staging"
+        docker build --target production -t "$IMAGE_TAG" .
+        docker push "$IMAGE_TAG"
       if: github.ref == 'refs/heads/staging'
 
     - name: Docker Build and Push Prod
       run: |
         cd app
-        docker build -t ${{ secrets.DOCKER_USERNAME }}/node-app:${{ steps.updated-version.outputs.version }}-prod .
-        docker push ${{ secrets.DOCKER_USERNAME }}/node-app:${{ steps.updated-version.outputs.version }}-prod
+        IMAGE_TAG="${{ secrets.DOCKER_USERNAME }}/node-app:${{ steps.updated-version.outputs.version }}-prod"
+        docker build --target production -t "$IMAGE_TAG" .
+        docker push "$IMAGE_TAG"
       if: github.ref == 'refs/heads/prod'
 
     - name: Notify Slack - Release
@@ -184,7 +198,7 @@ jobs:
         AS_VERSION: ${{ steps.updated-version.outputs.version }}
       if: |
         github.ref == 'refs/heads/dev' &&
-        ${{ steps.version-increment.outputs.release }} == 'true'
+        steps.version-increment.outputs.release == 'true'
 
     - name: Notify Slack
       uses: 8398a7/action-slack@v3
@@ -201,7 +215,7 @@ jobs:
       env:
         SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK }}
         AS_VERSION: ${{ steps.updated-version.outputs.version }}
-      if: ${{ steps.version-increment.outputs.release }} == 'false'
+      if: steps.version-increment.outputs.release == 'false'
 
   deployment:
     needs: build
@@ -211,94 +225,81 @@ jobs:
       TF_IN_AUTOMATION: "1"
       S3_BUCKET: ${{ secrets.S3_BUCKET }}
       S3_REGION: ${{ secrets.S3_REGION }}
-      DYNAMODB_TABLE: ${{ secrets.DYNAMODB_TABLE }}
       AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
       AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-      AWS_DEFAULT_REGION: ${{ secrets.AWS_DEFAULT_REGION }}
+      AWS_DEFAULT_REGION: ${{ secrets.S3_REGION }}
       ENVIRONMENT: ${{ needs.build.outputs.currentENV }}
       TF_VAR_environment: ${{ needs.build.outputs.currentENV }}
-      NODE_VERSION: ${{ env.NODE_VERSION }}
+      DOMAIN_NAME: ${{ secrets.CLOUDFLARE_DOMAIN }}
 
     steps:
     - name: Checkout Code
       uses: actions/checkout@v4
 
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: ${{ env.NODE_VERSION }}
-        cache: 'npm'
-        cache-dependency-path: app/package-lock.json
-
     - name: Terraform CLI Setup
       uses: hashicorp/setup-terraform@v3
 
-    - name: Install AWS CLI v2
-      run: |
-        curl "https://awscli.amazonaws.com/awscli-exe-linux-x86_64.zip" -o "awscliv2.zip"
-        unzip awscliv2.zip
-        sudo ./aws/install --update       
-    
-    - name: Terraform Init EKS
-      run: |
-        cd terraform
-        terraform init \
-          -backend-config="bucket=${S3_BUCKET}" \
-          -backend-config="key=state/${ENVIRONMENT}-env.tfstate" \
-          -backend-config="region=${S3_REGION}" \
-          -backend-config="encrypt=true" \
-          -backend-config="dynamodb_table=${DYNAMODB_TABLE}"
+    - name: Install Kustomize
+      uses: azure/setup-kustomize@v4
+      with:
+        version: 'latest'
 
-    
     - name: Install Kubectl
       uses: azure/setup-kubectl@v4
       with:
         version: 'latest'
 
+    - name: Terraform Init EKS
+      working-directory: terraform
+      run: |
+        terraform init \
+          -backend-config="bucket=${S3_BUCKET}" \
+          -backend-config="key=state/${ENVIRONMENT}-env.tfstate" \
+          -backend-config="region=${S3_REGION}" \
+          -backend-config="encrypt=true"
+
     - name: Configure Kubectl if EKS running
-      run: aws eks --region ${{ secrets.S3_REGION }} update-kubeconfig --name e2ecicd-eks-${ENVIRONMENT} || install -m 600 -D /dev/null ~/.kube/config
-    
+      run: aws eks --region "$S3_REGION" update-kubeconfig --name "e2ecicd-eks-${ENVIRONMENT}" || install -m 600 -D /dev/null ~/.kube/config
+
     - name: Terraform Plan EKS
       id: tf-plan-eks
+      working-directory: terraform
       run: |
-        cd terraform
-        export exitcode=0
-        terraform plan -detailed-exitcode -no-color -out tfplan
-        export exitcode=$?
+        terraform plan -detailed-exitcode -no-color -out=tfplan
+        exitcode=$?
 
-             
-        if [ $exitcode -eq 1 ]; then
+        if [ "$exitcode" -eq 1 ]; then
           echo "Terraform Plan Failed!"
           exit 1
-        elif [ $exitcode -eq 2 ]; then
-           echo "Drift detected. Need to run terraform apply"
-           echo "exitcode=$exitcode" >> $GITHUB_OUTPUT
-           exit 0
-        else 
+        elif [ "$exitcode" -eq 2 ]; then
+          echo "Drift detected. Need to run terraform apply"
+          echo "exitcode=$exitcode" >> "$GITHUB_OUTPUT"
+          exit 0
+        else
           exit 0
         fi
 
     - name: Deploy EKS Cluster
-      run: |
-        cd terraform
-        terraform apply -auto-approve tfplan
-      if: ${{ steps.tf-plan-eks.outputs.exitcode == '2' }}
+      working-directory: terraform
+      run: terraform apply -auto-approve tfplan
+      if: steps.tf-plan-eks.outputs.exitcode == '2'
 
     - name: Create Namespace
       run: |
         NAMESPACE=app-${ENVIRONMENT}
-        kubectl get ns ${NAMESPACE} || kubectl create namespace ${NAMESPACE}
+        kubectl get ns "$NAMESPACE" || kubectl create namespace "$NAMESPACE"
 
     - name: Update Image
-      run: |
-        image=${{ secrets.DOCKER_USERNAME }}/node-app:${{ needs.build.outputs.currentVersion }}-${ENVIRONMENT}
-        sed -i "s|image: .*$|image: ${image}|" kustomize/overlays/${ENVIRONMENT}/deploy-${ENVIRONMENT}.yaml
+      working-directory: kustomize/overlays/${{ needs.build.outputs.currentENV }}
+      env:
+        IMAGE: ${{ secrets.DOCKER_USERNAME }}/node-app:${{ needs.build.outputs.currentVersion }}-${{ needs.build.outputs.currentENV }}
+      run: kustomize edit set image "node-app=$IMAGE"
 
     - name: Install Kustomized Manifests
       id: kustomize-deploy
       run: |
-        kubectl apply -k kustomize/overlays/${ENVIRONMENT} | tee kubeout
-        
+        kubectl apply -k "kustomize/overlays/${ENVIRONMENT}" | tee kubeout
+
         if grep -q "deployment.*unchanged" kubeout; then
           echo "needRestart=yes" >> "$GITHUB_OUTPUT"
         else
@@ -306,27 +307,27 @@ jobs:
         fi
 
     - name: Rollout Restart Deployment
-      run: kubectl -n app-${ENVIRONMENT} rollout restart deployment web-deployment
-      if: ${{ steps.kustomize-deploy.outputs.needRestart == 'yes' }}
+      run: kubectl -n "app-${ENVIRONMENT}" rollout restart deployment web-deployment
+      if: steps.kustomize-deploy.outputs.needRestart == 'yes'
 
     - name: Get LB hostname
       id: lb-hostname
       run: |
         kubectl -n ingress-nginx get svc ingress-nginx-controller \
           -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' > lb-hostname
-          echo -n "hostname=$(cat lb-hostname)" >> "$GITHUB_OUTPUT"
-    
+        echo -n "hostname=$(cat lb-hostname)" >> "$GITHUB_OUTPUT"
+
     - name: Set DNS on Cloudflare
       uses: rez0n/create-dns-record@v2.1
       with:
         type: "CNAME"
-        name: "${{ needs.build.outputs.currentENV }}.afraz.dev"
+        name: "${{ needs.build.outputs.currentENV }}.${{ secrets.CLOUDFLARE_DOMAIN }}"
         content: ${{ steps.lb-hostname.outputs.hostname }}
         ttl: 1
         proxied: true
         token: ${{ secrets.CLOUDFLARE_TOKEN }}
         zone: ${{ secrets.CLOUDFLARE_ZONE }}
-   
+
     - name: Notify Slack - Deployment
       uses: 8398a7/action-slack@v3
       with:
@@ -342,15 +343,15 @@ jobs:
       env:
         SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK }}
         AS_VERSION: ${{ needs.build.outputs.currentVersion }}
-        AS_DNS: "https://${{ needs.build.outputs.currentENV }}.afraz.dev"
-        
+        AS_DNS: "https://${{ needs.build.outputs.currentENV }}.${{ secrets.CLOUDFLARE_DOMAIN }}"
+
     - name: Run security scan on deployed application
-      uses: aquasecurity/trivy-action@master
+      uses: aquasecurity/trivy-action@0.28.0
       with:
         image-ref: ${{ secrets.DOCKER_USERNAME }}/node-app:${{ needs.build.outputs.currentVersion }}-${{ needs.build.outputs.currentENV }}
         format: 'sarif'
         output: 'trivy-results.sarif'
-        
+
     - name: Upload Trivy scan results
       uses: github/codeql-action/upload-sarif@v3
       if: always()

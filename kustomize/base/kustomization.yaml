@@ -2,28 +2,25 @@ apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
 resources:
-- deploy.yaml
-- svc.yaml
-- ingress.yaml
+  - deploy.yaml
+  - svc.yaml
+  - ingress.yaml
 
 namespace: default
 
-configMapGenerator:
-- name: app-config
-  literals:
-  - ENV=production
-  - LOG_LEVEL=info
-  - PORT=3000
-
-commonLabels:
-  app: web
-  environment: production
-  version: v1
-
+# Placeholder image name. Overlays (or CD pipelines) replace it with:
+#   kustomize edit set image node-app=<registry>/<repo>:<tag>
 images:
-- name: aphraz/node-app
-  newTag: latest
+  - name: node-app
+    newTag: latest
 
 replicas:
-- name: web-deployment
-  count: 1
+  - name: web-deployment
+    count: 1
+
+configMapGenerator:
+  - name: app-config
+    literals:
+      - ENV=production
+      - LOG_LEVEL=info
+      - PORT=3000

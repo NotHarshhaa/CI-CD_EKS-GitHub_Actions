@@ -1,22 +1,31 @@
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 
+namespace: app-staging
+
 resources:
   - ../../base
 
 patches:
   - path: deploy-staging.yaml
-  - path: svc-staging.yaml
   - path: ingress-staging.yaml
 
-namespace: app-staging
+labels:
+  - includeSelectors: false
+    pairs:
+      environment: staging
+
+images:
+  - name: node-app
+    newTag: latest
+
+replicas:
+  - name: web-deployment
+    count: 2
 
 configMapGenerator:
   - name: app-config
+    behavior: merge
     literals:
       - ENV=staging
       - LOG_LEVEL=info
-
-images:
-  - name: aphraz/node-app
-    newTag: "1.1.1-staging"  # Ensures the latest staging image is used

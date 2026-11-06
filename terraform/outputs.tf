@@ -20,14 +20,14 @@ output "cluster_name" {
   value       = module.eks.cluster_name
 }
 
-output "node_group_arns" {
-  description = "ARNs of the EKS managed node groups"
-  value       = module.eks.node_group_arns
+output "eks_managed_node_group_arns" {
+  description = "List of EKS managed node group ARNs"
+  value       = [for ng in module.eks.eks_managed_node_groups : ng.arn]
 }
 
-output "node_group_ids" {
-  description = "IDs of the EKS managed node groups"
-  value       = module.eks.node_group_ids
+output "eks_managed_node_group_names" {
+  description = "Names of the EKS managed node groups"
+  value       = keys(module.eks.eks_managed_node_groups)
 }
 
 output "vpc_id" {

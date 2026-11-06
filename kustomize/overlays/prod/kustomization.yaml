@@ -4,37 +4,32 @@ kind: Kustomization
 namespace: app-prod
 
 resources:
-- ../../base
+  - ../../base
 
-patchesStrategicMerge:
-- deploy-prod.yaml
-- svc-prod.yaml
-- ingress-prod.yaml
+patches:
+  - path: deploy-prod.yaml
+  - path: ingress-prod.yaml
 
-configMapGenerator:
-- name: app-prod-config
-  literals:
-  - ENV=production
-  - LOG_LEVEL=warn
-  - PORT=3000
-  options:
-    disableNameSuffixHash: false
-
-secretGenerator:
-- name: app-prod-secrets
-  envs:
-  - secrets.env
-  options:
-    disableNameSuffixHash: false
-
-replicas:
-- name: web-deployment
-  count: 3
+labels:
+  - includeSelectors: false
+    pairs:
+      environment: production
+      tier: application
 
 images:
-- name: aphraz/node-app
-  newTag: production
+  - name: node-app
+    newTag: latest
 
-commonLabels:
-  environment: production
-  tier: application
+replicas:
+  - name: web-deployment
+    count: 3
+
+configMapGenerator:
+  - name: app-config
+    behavior: merge
+    literals:
+      - ENV=production
+      - LOG_LEVEL=warn
+
+# Secrets (e.g. TLS certs) are provisioned out-of-band, not committed:
+#   kubectl -n app-prod create secret generic app-prod-secrets --from-env-file=secrets.env

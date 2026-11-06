@@ -1,14 +1,27 @@
-function add(numbers) {
-    if (!numbers) return 0; // Handle empty input gracefully
+const INTEGER_PATTERN = /^[+-]?\d+$/;
 
-    return numbers
-        .split(',')
-        .map(x => {
-            const num = parseInt(x.trim(), 10);
-            if (isNaN(num)) throw new Error(`Invalid number: ${x}`);
-            return num;
-        })
-        .reduce((a, b) => a + b, 0); // Ensure it works with a single number
+/**
+ * Adds comma-separated integers.
+ * @param {string} numbers - Comma-separated integers, e.g. "1,2,3".
+ * @returns {number} The sum of all integers.
+ * @throws {Error} If input is not a string or contains non-integer values.
+ */
+function add(numbers) {
+  if (numbers === undefined || numbers === null || numbers === '') return 0;
+
+  if (typeof numbers !== 'string') {
+    throw new Error('Input must be a string of comma-separated integers');
+  }
+
+  return numbers
+    .split(',')
+    .reduce((sum, token) => {
+      const value = token.trim();
+      if (!INTEGER_PATTERN.test(value)) {
+        throw new Error(`Invalid number: ${token.trim() || '(empty)'}`);
+      }
+      return sum + Number(value);
+    }, 0);
 }
 
 module.exports = { add };

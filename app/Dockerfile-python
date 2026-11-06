@@ -1,5 +1,5 @@
 # Use a smaller base image for reduced size
-FROM python:3.11-alpine
+FROM python:3.12-alpine
 
 # Set a working directory
 WORKDIR /app
@@ -10,7 +10,7 @@ ENV FLASK_APP=app.py \
     PIP_NO_CACHE_DIR=1
 
 # Install dependencies
-COPY requirements.txt .  
+COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy application files
@@ -20,8 +20,11 @@ COPY . .
 RUN addgroup -S appgroup && adduser -S appuser -G appgroup
 USER appuser
 
-# Expose the Flask port
+# Expose the gunicorn port
 EXPOSE 5000
 
-# Run the application
-CMD ["flask", "run", "--host=0.0.0.0", "--port=5000"]
+HEALTHCHECK --interval=30s --timeout=3s --start-period=5s --retries=3 \
+  CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:5000/', timeout=2)"
+
+# Run the application with a production WSGI server
+CMD ["gunicorn", "--bind", "0.0.0.0:5000", "--workers", "2", "app:app"]

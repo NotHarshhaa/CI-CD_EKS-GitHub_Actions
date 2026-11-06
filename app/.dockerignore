@@ -1,29 +1,19 @@
-# Ignore Docker-related files
-Dockerfile
-Dockerfile-python
-
-# Ignore dependency folders
+# Dependencies
 node_modules
-__pycache__
+coverage
 
-# Ignore log files and temp files
-npm-debug.log
+# Logs and temp files
+npm-debug.log*
 *.log
 
-# Ignore application-specific files
-app.py
-
-# Ignore Infrastructure as Code (IaC) directories
-terraform/
-kustomize/
-
-# Ignore Python virtual environments
-venv/
+# Environment
 .env
+.env.*
 
-# Ignore system and IDE-specific files
-*.swp
-*.swo
+# Python bytecode
+__pycache__
+
+# OS / editor
 .DS_Store
-.idea/
-.vscode/
+.idea
+.vscode

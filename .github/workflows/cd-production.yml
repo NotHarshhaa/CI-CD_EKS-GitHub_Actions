@@ -6,44 +6,48 @@ on:
     tags: [ 'v*' ]
   workflow_dispatch:
 
+permissions:
+  contents: read
+  security-events: write
+
+concurrency:
+  group: cd-production
+  cancel-in-progress: false
+
 env:
   AWS_REGION: us-west-2
   ECR_REPOSITORY: calculator-app
-  EKS_CLUSTER_NAME: e2ecicd-cluster
-  NODE_VERSION: 20
+  # Must match terraform locals: e2ecicd-eks-${environment} for env "prod"
+  EKS_CLUSTER_NAME: e2ecicd-eks-prod
+  EKS_NAMESPACE: app-prod
 
 jobs:
   build-and-push:
     runs-on: ubuntu-latest
-    
+    outputs:
+      image: ${{ steps.build-image.outputs.image }}
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-      
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: ${{ env.NODE_VERSION }}
-        cache: 'npm'
-        cache-dependency-path: app/package-lock.json
-        
+
     - name: Configure AWS credentials
       uses: aws-actions/configure-aws-credentials@v4
       with:
         aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         aws-region: ${{ env.AWS_REGION }}
-        
+
     - name: Login to Amazon ECR
       id: login-ecr
       uses: aws-actions/amazon-ecr-login@v2
-      
+
     - name: Run tests
       run: |
         cd app
         npm ci
-        npm test -- --coverage
-        
+        npm test
+
     - name: Build, tag, and push image to Amazon ECR
       id: build-image
       env:
@@ -51,84 +55,93 @@ jobs:
         IMAGE_TAG: ${{ github.sha }}
       run: |
         cd app
-        docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
-        docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:latest .
-        docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
-        docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
-        echo "image=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_OUTPUT
-        
-    - name: Update deployment image using Kustomize
-      run: |
-        cd kustomize/overlays/production
-        kustomize edit set image ${{ steps.build-image.outputs.image }}
-        kustomize build . > updated-deployment.yaml
-        
-    - name: Commit updated deployment
-      run: |
-        git config --local user.email "action@github.com"
-        git config --local user.name "GitHub Action"
-        git add kustomize/overlays/production/kustomization.yaml
-        git commit -m "Update deployment image to ${{ github.sha }}" || exit 0
-        git push
+        IMAGE="$ECR_REGISTRY/$ECR_REPOSITORY"
+        docker build --target production \
+          -t "$IMAGE:$IMAGE_TAG" \
+          -t "$IMAGE:latest" .
+        docker push "$IMAGE:$IMAGE_TAG"
+        docker push "$IMAGE:latest"
+        echo "image=$IMAGE:$IMAGE_TAG" >> "$GITHUB_OUTPUT"
 
   deploy-to-eks:
     needs: build-and-push
     runs-on: ubuntu-latest
-    
+
     steps:
     - name: Checkout code
       uses: actions/checkout@v4
-      
-    - name: Setup Node.js
-      uses: actions/setup-node@v4
-      with:
-        node-version: ${{ env.NODE_VERSION }}
-        cache: 'npm'
-        cache-dependency-path: app/package-lock.json
-        
+
     - name: Configure AWS credentials
       uses: aws-actions/configure-aws-credentials@v4
       with:
         aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
         aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
         aws-region: ${{ env.AWS_REGION }}
-        
+
+    - name: Setup Kustomize
+      uses: azure/setup-kustomize@v4
+      with:
+        version: 'latest'
+
+    - name: Install kubectl
+      uses: azure/setup-kubectl@v4
+      with:
+        version: 'latest'
+
     - name: Update kubeconfig
       run: |
-        aws eks update-kubeconfig --region ${{ env.AWS_REGION }} --name ${{ env.EKS_CLUSTER_NAME }}
-        
+        aws eks update-kubeconfig --region "$AWS_REGION" --name "$EKS_CLUSTER_NAME"
+
     - name: Deploy to EKS
+      working-directory: kustomize/overlays/prod
+      env:
+        IMAGE: ${{ needs.build-and-push.outputs.image }}
       run: |
-        kubectl apply -k kustomize/overlays/production/
-        
+        kustomize edit set image "node-app=$IMAGE"
+        kustomize build .
+        kubectl apply -k .
+
     - name: Verify deployment
       run: |
-        kubectl rollout status deployment/web-deployment -n app-prod --timeout=300s
-        kubectl get pods -l app=web -n app-prod
-        
+        kubectl rollout status deployment/web-deployment -n "$EKS_NAMESPACE" --timeout=300s
+        kubectl get pods -l app=web -n "$EKS_NAMESPACE"
+
     - name: Run smoke tests
       run: |
-        # Get the service endpoint
-        SERVICE_URL=$(kubectl get service web-service -n app-prod -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+        # The app Service is ClusterIP; traffic enters through the ingress controller LB
+        SERVICE_URL=$(kubectl -n ingress-nginx get svc ingress-nginx-controller \
+          -o jsonpath='{.status.loadBalancer.ingress[0].hostname}')
+        if [ -z "$SERVICE_URL" ]; then
+          echo "Ingress controller LoadBalancer hostname not found"
+          exit 1
+        fi
         echo "Service URL: http://$SERVICE_URL"
-        
-        # Wait for service to be ready
-        for i in {1..30}; do
-          if curl -f http://$SERVICE_URL/health; then
+
+        HEALTH_PASSED=false
+        for i in $(seq 1 30); do
+          # Ingress redirects HTTP->HTTPS (301), so probe HTTPS directly.
+          # -k accepts the real cert or ingress-nginx's fallback cert.
+          if curl -sk --resolve "prod.afraz.dev:443:$SERVICE_URL" "https://prod.afraz.dev/health" | grep -q '"status":"healthy"'; then
             echo "Health check passed"
+            HEALTH_PASSED=true
             break
           fi
           echo "Waiting for service to be ready... ($i/30)"
           sleep 10
         done
-        
-    - name: Run security scan on deployed application
-      uses: aquasecurity/trivy-action@master
+
+        if [ "$HEALTH_PASSED" != "true" ]; then
+          echo "::error::Health check failed after 30 attempts"
+          exit 1
+        fi
+
+    - name: Run security scan on deployed image
+      uses: aquasecurity/trivy-action@0.28.0
       with:
         image-ref: ${{ needs.build-and-push.outputs.image }}
         format: 'sarif'
         output: 'trivy-results.sarif'
-        
+
     - name: Upload Trivy scan results
       uses: github/codeql-action/upload-sarif@v3
       if: always()

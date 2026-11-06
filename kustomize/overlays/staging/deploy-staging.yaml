@@ -2,33 +2,15 @@ apiVersion: apps/v1
 kind: Deployment
 metadata:
   name: web-deployment
-  labels:
-    app: web
-    env: staging
 spec:
-  replicas: 3
-  selector:
-    matchLabels:
-      app: web
   template:
-    metadata:
-      labels:
-        app: web
     spec:
       containers:
-      - name: nginx
-        image: aphraz/node-app:1.1.1-staging
-        imagePullPolicy: Always
-        resources:
-          limits:
-            cpu: "750m"
-            memory: "512Mi"
-          requests:
-            cpu: "500m"
-            memory: "512Mi"
-      restartPolicy: Always
-  strategy:
-    type: RollingUpdate
-    rollingUpdate:
-      maxSurge: 1
-      maxUnavailable: 1
+        - name: web-app  # Must match the container name in the base deployment
+          resources:
+            requests:
+              cpu: 100m
+              memory: 128Mi
+            limits:
+              cpu: 750m
+              memory: 512Mi

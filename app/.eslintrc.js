@@ -1,6 +1,5 @@
 module.exports = {
   env: {
-    browser: true,
     commonjs: true,
     es2022: true,
     node: true,
@@ -8,14 +7,14 @@ module.exports = {
   },
   extends: [
     'eslint:recommended',
-    'plugin:security/recommended',
+    'plugin:security/recommended-legacy',
     'plugin:import/recommended',
     'plugin:promise/recommended'
   ],
   plugins: ['security', 'import', 'promise'],
   parserOptions: {
     ecmaVersion: 'latest',
-    sourceType: 'module'
+    sourceType: 'script'
   },
   settings: {
     'import/resolver': {
@@ -30,9 +29,9 @@ module.exports = {
     'linebreak-style': ['error', 'unix'],
     'quotes': ['error', 'single', { avoidEscape: true }],
     'semi': ['error', 'always'],
-    
+
     // Best practices
-    'no-unused-vars': ['error', { 
+    'no-unused-vars': ['error', {
       'argsIgnorePattern': '^_',
       'varsIgnorePattern': '^_',
       'caughtErrorsIgnorePattern': '^_'
@@ -43,7 +42,7 @@ module.exports = {
     'prefer-arrow-callback': 'error',
     'arrow-spacing': 'error',
     'no-duplicate-imports': 'error',
-    
+
     // Security
     'security/detect-object-injection': 'warn',
     'security/detect-non-literal-regexp': 'warn',
@@ -57,7 +56,7 @@ module.exports = {
     'security/detect-non-literal-require': 'warn',
     'security/detect-possible-timing-attacks': 'warn',
     'security/detect-pseudoRandomBytes': 'error',
-    
+
     // Import rules
     'import/order': ['error', {
       'groups': ['builtin', 'external', 'internal', 'parent', 'sibling', 'index'],
@@ -65,7 +64,7 @@ module.exports = {
     }],
     'import/no-unresolved': 'error',
     'import/no-cycle': 'error',
-    
+
     // Promise rules
     'promise/always-return': 'error',
     'promise/no-return-wrap': 'error',
@@ -77,6 +76,13 @@ module.exports = {
     'promise/no-callback-in-promise': 'warn'
   },
   overrides: [
+    {
+      // The server entrypoint reports lifecycle events to stdout by design.
+      files: ['index.js'],
+      rules: {
+        'no-console': 'off'
+      }
+    },
     {
       files: ['*.test.js', '*.spec.js'],
       env: {

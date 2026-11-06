@@ -6,12 +6,6 @@ data "aws_availability_zones" "available" {
   }
 }
 
-# Generate a unique suffix for resource naming to avoid conflicts
-resource "random_string" "suffix" {
-  length  = 8
-  special = false
-}
-
 # ✅ VPC Module - Configuring the VPC with NAT Gateway, DNS, and Subnet Tagging
 module "vpc" {
   source  = "terraform-aws-modules/vpc/aws"
@@ -49,7 +43,7 @@ module "eks" {
   version = "19.21.0"
 
   cluster_name    = local.cluster_name
-  cluster_version = "1.29"
+  cluster_version = "1.31"
 
   vpc_id                         = module.vpc.vpc_id
   subnet_ids                     = module.vpc.private_subnets
